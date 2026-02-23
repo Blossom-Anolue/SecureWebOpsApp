@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core brand - trustworthy teal/blue */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Primary - Deep teal for trust */
+    --primary: 187 60% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Soft slate */
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 210 15% 92%;
+    --muted-foreground: 215 15% 50%;
+
+    /* Accent - Vibrant teal */
+    --accent: 175 55% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 187 60% 32%;
+
+    --radius: 0.75rem;
+
+    /* Semantic severity colors */
+    --severity-critical: 0 72% 51%;
+    --severity-critical-bg: 0 72% 96%;
+    --severity-high: 25 95% 53%;
+    --severity-high-bg: 25 95% 95%;
+    --severity-medium: 45 93% 47%;
+    --severity-medium-bg: 45 93% 95%;
+    --severity-low: 142 71% 45%;
+    --severity-low-bg: 142 71% 95%;
+
+    /* Security score tiers */
+    --score-ok: 142 71% 45%;
+    --score-ok-bg: 142 71% 95%;
+    --score-at-risk: 45 93% 47%;
+    --score-at-risk-bg: 45 93% 95%;
+    --score-critical: 0 72% 51%;
+    --score-critical-bg: 0 72% 96%;
+
+    /* Sidebar */
+    --sidebar-background: 215 25% 15%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 175 55% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 25% 25%;
+    --sidebar-ring: 175 55% 45%;
+
+    /* Custom shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.08), 0 2px 4px -2px hsl(215 25% 15% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.08), 0 4px 6px -4px hsl(215 25% 15% / 0.06);
+    --shadow-card: 0 1px 3px 0 hsl(215 25% 15% / 0.06), 0 1px 2px -1px hsl(215 25% 15% / 0.06);
+    --shadow-card-hover: 0 4px 12px 0 hsl(215 25% 15% / 0.1), 0 2px 4px -1px hsl(215 25% 15% / 0.06);
+  }
+
+  .dark {
+    --background: 215 25% 9%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 25% 12%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 25% 12%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 175 55% 45%;
+    --primary-foreground: 215 25% 9%;
+
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 215 20% 18%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 175 55% 45%;
+    --accent-foreground: 215 25% 9%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 20%;
+    --input: 215 25% 20%;
+    --ring: 175 55% 45%;
+
+    --severity-critical-bg: 0 72% 20%;
+    --severity-high-bg: 25 95% 20%;
+    --severity-medium-bg: 45 93% 20%;
+    --severity-low-bg: 142 71% 20%;
+
+    --score-ok-bg: 142 71% 20%;
+    --score-at-risk-bg: 45 93% 20%;
+    --score-critical-bg: 0 72% 20%;
+
+    --sidebar-background: 215 25% 7%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-accent: 215 25% 14%;
+    --sidebar-border: 215 25% 15%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-score-fill {
+    animation: scoreFill 1s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scoreFill {
+    from { stroke-dashoffset: 283; }
+  }
+}

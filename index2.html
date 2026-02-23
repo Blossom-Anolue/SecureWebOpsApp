@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureWebOps - Encryption Test</title>
+    <style>
+        body { font-family: sans-serif; padding: 50px; line-height: 1.6; }
+        .container { max-width: 500px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 10px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; }
+        #status { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>PDF Shield Module Test</h2>
+        <p>Select a PDF to encrypt and upload to Supabase.</p>
+        <input type="file" id="pdfFile" accept=".pdf">
+        <br><br>
+        <button onclick="testUpload()">Encrypt & Upload</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function testUpload() {
+            const fileInput = document.getElementById('pdfFile');
+            const status = document.getElementById('status');
+            
+            if (!fileInput.files[0]) {
+                alert("Please select a file first!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdf', fileInput.files[0]);
+
+            status.innerText = "Processing: Encrypting with AES-256-GCM...";
+            status.style.color = "blue";
+
+            try {
+                // This calls your local Node.js server
+                const response = await fetch('http://localhost:3000/api/pdf/encrypt', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    status.innerText = "✅ Success! Encrypted file saved: " + result.file;
+                    status.style.color = "green";
+                    console.log("Audit Log created in Supabase.");
+                } else {
+                    status.innerText = "❌ Error: " + result.error;
+                    status.style.color = "red";
+                }
+            } catch (err) {
+                status.innerText = "❌ Connection Failed. Is server.js running?";
+                status.style.color = "red";
+            }
+        }
+    </script>
+</body>
+</html>

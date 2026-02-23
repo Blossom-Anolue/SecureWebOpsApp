@@ -1,0 +1,16 @@
+project_id = "difuqjvkgctucfvekjan"
+
+[functions.analyze-phishing]
+verify_jwt = false
+
+[functions.security-scan]
+verify_jwt = false
+
+[functions.send-scan-notification]
+verify_jwt = false
+
+[functions.generate-pdf-report]
+verify_jwt = false
+
+[functions.scheduled-scan]
+verify_jwt = false
