@@ -16,10 +16,11 @@ import {
 import { KeyboardShortcutsDialog } from '@/components/shortcuts/KeyboardShortcutsDialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { TeamPresence } from '@/components/presence/TeamPresence';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { useOrganizations } from '@/hooks/useOrganizations';
+import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -40,7 +41,9 @@ const navItems = [
 export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
   const { signOut, user } = useAuth();
   const { data: organizations } = useOrganizations();
+  const { data: pendingInvites } = usePendingInvites();
   const primaryOrg = organizations?.[0];
+  const pendingInviteCount = pendingInvites?.length ?? 0;
 
   const handleSignOut = async () => {
     await signOut();
@@ -104,7 +107,12 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
                 }
               >
                 <item.icon className="w-5 h-5" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === '/team' && pendingInviteCount > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
+                    {pendingInviteCount}
+                  </Badge>
+                )}
               </NavLink>
             </li>
           ))}

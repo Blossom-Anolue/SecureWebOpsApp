@@ -12,6 +12,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Shield, FileUp, Lock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 type EncryptionResponse = {
   message?: string;
@@ -25,11 +26,15 @@ type EncryptionResponse = {
 };
 
 type RecentEncryptedFile = {
+  id?: string;
   name: string;
+  originalFileName?: string;
   path: string;
   createdAt?: string | null;
   size?: number | null;
   mimeType?: string | null;
+  keyLabel?: string | null;
+  organizationId?: string | null;
 };
 
 type RecentFilesResponse = {
@@ -52,6 +57,7 @@ function deriveMetadata(payload: EncryptionResponse): EncryptionResponse {
 }
 
 export default function PDFEncryption() {
+  const { session } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -65,10 +71,20 @@ export default function PDFEncryption() {
   const RECENT_URL = import.meta.env.VITE_PDF_RECENT_URL || "/api/pdf/recent?limit=8";
 
   const loadRecentFiles = async () => {
+    if (!session?.access_token) {
+      setRecentFiles([]);
+      setRecentLoading(false);
+      return;
+    }
+
     try {
       setRecentLoading(true);
       setRecentError('');
-      const response = await fetch(RECENT_URL);
+      const response = await fetch(RECENT_URL, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
       const payload = (await response.json()) as RecentFilesResponse & { error?: string };
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to load recent encrypted files.');
@@ -85,7 +101,7 @@ export default function PDFEncryption() {
 
   useEffect(() => {
     void loadRecentFiles();
-  }, []);
+  }, [session?.access_token]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -95,6 +111,11 @@ export default function PDFEncryption() {
 
   const handleUpload = async () => {
     if (!file) return;
+    if (!session?.access_token) {
+      setStatus('error');
+      setMessage('Sign in again before encrypting a PDF.');
+      return;
+    }
 
     setStatus('uploading');
     const formData = new FormData();
@@ -103,6 +124,9 @@ export default function PDFEncryption() {
     try {
       const response = await fetch(BACKEND_URL, {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: formData,
       });
 
@@ -224,8 +248,10 @@ export default function PDFEncryption() {
             {recentFiles.map((entry) => (
               <div key={entry.path} className="border rounded-md p-3 text-sm">
                 <p><strong>File:</strong> {entry.name}</p>
+                <p><strong>Original:</strong> {entry.originalFileName || '-'}</p>
                 <p><strong>Date:</strong> {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '-'}</p>
                 <p><strong>Size:</strong> {typeof entry.size === 'number' ? `${Math.round(entry.size / 1024)} KB` : '-'}</p>
+                <p><strong>Key label:</strong> {entry.keyLabel || '-'}</p>
                 <p><strong>Storage:</strong> {recentBucket} / {entry.path}</p>
               </div>
             ))}

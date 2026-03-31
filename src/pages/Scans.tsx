@@ -12,7 +12,9 @@ import { cn } from '@/lib/utils';
 const statusConfig = {
   completed: { icon: CheckCircle2, label: 'Completed', color: 'text-score-ok' },
   running: { icon: Loader2, label: 'Running', color: 'text-primary' },
+  queued: { icon: Loader2, label: 'Queued', color: 'text-primary' },
   pending: { icon: Clock, label: 'Pending', color: 'text-muted-foreground' },
+  canceled: { icon: XCircle, label: 'Canceled', color: 'text-muted-foreground' },
   failed: { icon: XCircle, label: 'Failed', color: 'text-score-critical' },
 };
 
@@ -106,7 +108,7 @@ export default function Scans() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(scan.started_at), 'MMM d, yyyy · h:mm a')}
+                      {format(new Date(scan.started_at ?? scan.created_at ?? new Date().toISOString()), 'MMM d, yyyy · h:mm a')}
                     </p>
                   </div>
 
@@ -115,7 +117,7 @@ export default function Scans() {
                     <StatusIcon className={cn(
                       "w-4 h-4",
                       status.color,
-                      scan.status === 'running' && "animate-spin"
+                      (scan.status === 'running' || scan.status === 'queued') && "animate-spin"
                     )} />
                     <span className={cn("text-sm font-medium", status.color)}>
                       {status.label}

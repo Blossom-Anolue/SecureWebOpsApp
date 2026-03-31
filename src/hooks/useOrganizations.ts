@@ -61,7 +61,7 @@ export interface OrganizationMember {
   /** ID of the organization */
   organization_id: string;
   /** ID of the user (or placeholder for pending invites) */
-  user_id: string;
+  user_id: string | null;
   /** Role of the member within the organization */
   role: AppRole;
   /** Email address used for the invitation */
@@ -72,6 +72,7 @@ export interface OrganizationMember {
   joined_at: string | null;
   /** Record creation timestamp */
   created_at: string;
+  organizations?: Pick<Organization, 'id' | 'name' | 'slug'> | null;
 }
 
 // ============================================================================
@@ -150,6 +151,35 @@ export function useOrganizationMembers(orgId: string | undefined) {
       return data as OrganizationMember[];
     },
     enabled: !!user && !!orgId,
+  });
+}
+
+/**
+ * Fetches pending invites addressed to the signed-in user's email.
+ *
+ * @returns Query result containing array of pending invitations
+ */
+export function usePendingInvites() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['pending_invites', user?.id, user?.email],
+    queryFn: async () => {
+      const normalizedEmail = user?.email?.toLowerCase();
+      if (!normalizedEmail) return [];
+
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('*, organizations(id, name, slug)')
+        .is('user_id', null)
+        .eq('joined_at', null)
+        .eq('invited_email', normalizedEmail)
+        .order('invited_at', { ascending: false });
+
+      if (error) throw error;
+      return data as OrganizationMember[];
+    },
+    enabled: !!user?.id && !!user?.email,
   });
 }
 
@@ -265,15 +295,14 @@ export function useInviteMember() {
       email: string;
       role: AppRole;
     }) => {
-      // Create a pending invitation record
-      // The placeholder user_id indicates this is an unaccepted invitation
+      // Create a pending invitation record without a fake placeholder user id.
       const { data, error } = await supabase
         .from('organization_members')
         .insert({
           organization_id: organizationId,
-          user_id: '00000000-0000-0000-0000-000000000000', // Placeholder for pending invites
+          user_id: null,
           role,
-          invited_email: email,
+          invited_email: email.trim().toLowerCase(),
           invited_at: new Date().toISOString(),
           joined_at: null, // Will be set when user accepts
         })
@@ -285,6 +314,64 @@ export function useInviteMember() {
     },
     onSuccess: (_, variables) => {
       // Refresh the members list for this organization
+      queryClient.invalidateQueries({ queryKey: ['organization_members', variables.organizationId] });
+    },
+  });
+}
+
+/**
+ * Mutation hook for accepting a pending team invitation.
+ */
+export function useAcceptInvite() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ membershipId, organizationId }: { membershipId: string; organizationId: string }) => {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .update({
+          user_id: user!.id,
+          joined_at: new Date().toISOString(),
+        })
+        .eq('id', membershipId)
+        .is('user_id', null)
+        .eq('invited_email', user!.email!.toLowerCase())
+        .select('*, organizations(id, name, slug)')
+        .single();
+
+      if (error) throw error;
+      return data as OrganizationMember;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pending_invites'] });
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organization_members', variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['user_role', variables.organizationId] });
+    },
+  });
+}
+
+/**
+ * Mutation hook for declining a pending team invitation.
+ */
+export function useDeclineInvite() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ membershipId, organizationId }: { membershipId: string; organizationId: string }) => {
+      const { error } = await supabase
+        .from('organization_members')
+        .delete()
+        .eq('id', membershipId)
+        .is('user_id', null)
+        .eq('invited_email', user!.email!.toLowerCase());
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pending_invites'] });
       queryClient.invalidateQueries({ queryKey: ['organization_members', variables.organizationId] });
     },
   });

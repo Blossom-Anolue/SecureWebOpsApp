@@ -16,6 +16,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+const SCAN_TRIGGER_URL = import.meta.env.VITE_SCAN_TRIGGER_URL || '/api/scans/trigger';
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -35,6 +37,8 @@ export interface Domain {
   is_verified: boolean;
   /** Whether this is the user's primary/main domain */
   is_primary: boolean;
+  /** Organization that owns this domain, if it is company-scoped */
+  organization_id: string | null;
   /** Timestamp when the domain was added */
   created_at: string;
 }
@@ -55,7 +59,7 @@ export interface Scan {
   /** Type of scan: 'quick' (~5 min) or 'full' (~15-30 min) */
   scan_type: 'quick' | 'full';
   /** Current status of the scan */
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'pending' | 'running' | 'completed' | 'failed' | 'canceled';
   /** Overall security score (0-100), null if not completed */
   score: number | null;
   /** Count of critical severity issues found */
@@ -67,9 +71,15 @@ export interface Scan {
   /** Count of low severity issues found */
   low_count: number;
   /** Timestamp when the scan was started */
-  started_at: string;
+  started_at: string | null;
   /** Timestamp when the scan completed, null if still running */
   completed_at: string | null;
+  /** Original target URL sent to the scanner, if available */
+  target_url?: string | null;
+  /** Detailed backend error for failed scans */
+  scan_error?: string | null;
+  /** Timestamp when the scan row was created */
+  created_at?: string;
 }
 
 /**
@@ -126,6 +136,12 @@ export interface PhishingCheck {
   risk_level: 'high' | 'medium' | 'low';
   /** Plain-language verdict about the content */
   verdict: string;
+  /** Numeric phishing risk score (0-100) */
+  risk_score: number | null;
+  /** Company scope for shared phishing checks */
+  organization_id: string | null;
+  /** Analyzer/source used for this result */
+  analysis_source: string | null;
   /** Timestamp when the check was performed */
   checked_at: string;
 }
@@ -147,6 +163,28 @@ export interface PhishingRedFlag {
   description: string;
   /** Severity level of this red flag */
   severity: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface AnalyzePhishingPayload {
+  type: 'email' | 'link';
+  content: string;
+  subject?: string;
+  senderEmail?: string;
+  organizationId?: string | null;
+}
+
+export interface AnalyzePhishingResult {
+  id: string;
+  organizationId: string | null;
+  riskLevel: 'high' | 'medium' | 'low';
+  riskScore: number;
+  verdict: string;
+  redFlags: Array<{
+    title: string;
+    description: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+  source: string;
 }
 
 /**
@@ -171,8 +209,10 @@ export interface SecurityScore {
 export interface Profile {
   /** User ID (matches auth.users) */
   id: string;
-  /** Name of the user's business */
-  business_name: string | null;
+  /** User's display name */
+  full_name: string | null;
+  /** Name of the user's company */
+  company_name: string | null;
   /** Industry category for benchmarking */
   industry: string | null;
   /** Profile creation timestamp */
@@ -221,6 +261,7 @@ export function useDomains() {
       const { data, error } = await supabase
         .from('domains')
         .select('*')
+        .eq('user_id', user!.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -245,10 +286,14 @@ export function useAddDomain() {
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (domain: string) => {
+    mutationFn: async ({ domain, organizationId }: { domain: string; organizationId?: string | null }) => {
       const { data, error } = await supabase
         .from('domains')
-        .insert({ domain, user_id: user!.id })
+        .insert({
+          domain,
+          user_id: user!.id,
+          organization_id: organizationId ?? null,
+        })
         .select()
         .single();
       
@@ -343,7 +388,7 @@ export function useScanIssues(scanId: string | undefined) {
 
 /**
  * Mutation hook for creating a new security scan.
- * Creates the scan record and triggers the AI-powered security-scan edge function.
+ * Creates the scan record and triggers the OWASP ZAP-backed security-scan edge function.
  * 
  * @returns Mutation object with mutate/mutateAsync functions
  * 
@@ -361,6 +406,14 @@ export function useCreateScan() {
   
   return useMutation({
     mutationFn: async ({ domainId, domain, scanType }: { domainId: string; domain: string; scanType: 'quick' | 'full' }) => {
+      const { data: domainRecord, error: domainError } = await supabase
+        .from('domains')
+        .select('organization_id')
+        .eq('id', domainId)
+        .single();
+
+      if (domainError) throw domainError;
+
       // Step 1: Create the scan record in the database with 'pending' status
       const { data, error } = await supabase
         .from('scans')
@@ -368,6 +421,7 @@ export function useCreateScan() {
           user_id: user!.id,
           domain_id: domainId,
           domain,
+          organization_id: domainRecord.organization_id ?? null,
           scan_type: scanType,
           status: 'pending',
         })
@@ -376,18 +430,30 @@ export function useCreateScan() {
       
       if (error) throw error;
       
-      // Step 2: Trigger the AI security scan edge function asynchronously
-      // This runs in the background and updates the scan record when complete
+      // Step 2: Trigger the Node backend scanner asynchronously so it can reach the private ZAP host.
       const scanData = data as Scan;
-      supabase.functions.invoke('security-scan', {
-        body: {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      fetch(SCAN_TRIGGER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
           scanId: scanData.id,
           domain,
           scanType,
-        },
+        }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error || 'Failed to trigger backend scan');
+        }
       }).catch(err => {
         // Log error but don't fail - scan status will show 'failed' in DB
-        console.error('Error triggering security scan:', err);
+        console.error('Error triggering backend security scan:', err);
       });
       
       return scanData;
@@ -408,16 +474,22 @@ export function useCreateScan() {
  * 
  * @returns Query result containing array of PhishingCheck objects
  */
-export function usePhishingChecks() {
+export function usePhishingChecks(organizationId?: string) {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['phishing_checks', user?.id],
+    queryKey: ['phishing_checks', user?.id, organizationId ?? 'personal'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('phishing_checks')
         .select('*')
         .order('checked_at', { ascending: false });
+
+      query = organizationId
+        ? query.eq('organization_id', organizationId)
+        : query.is('organization_id', null);
+
+      const { data, error } = await query;
       
       if (error) throw error;
       return data as PhishingCheck[];
@@ -427,31 +499,51 @@ export function usePhishingChecks() {
 }
 
 /**
- * Mutation hook for creating a new phishing check.
+ * Fetches all red flags associated with a specific phishing check.
+ */
+export function usePhishingRedFlags(checkId: string | undefined) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['phishing_red_flags', checkId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('phishing_red_flags')
+        .select('*')
+        .eq('check_id', checkId)
+        .order('severity', { ascending: true });
+
+      if (error) throw error;
+      return data as PhishingRedFlag[];
+    },
+    enabled: !!user && !!checkId,
+  });
+}
+
+/**
+ * Mutation hook for analyzing a phishing email or link.
  * Automatically invalidates the phishing checks cache on success.
  * 
  * @returns Mutation object with mutate/mutateAsync functions
  */
-export function useCreatePhishingCheck() {
+export function useAnalyzePhishing() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (check: Omit<PhishingCheck, 'id' | 'user_id' | 'checked_at'>) => {
-      const { data, error } = await supabase
-        .from('phishing_checks')
-        .insert({
-          ...check,
-          user_id: user!.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (payload: AnalyzePhishingPayload) => {
+      const { data, error } = await supabase.functions.invoke('analyze-phishing', {
+        body: payload,
+      });
       
       if (error) throw error;
-      return data as PhishingCheck;
+      return data as AnalyzePhishingResult;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['phishing_checks'] });
+      queryClient.invalidateQueries({
+        queryKey: ['phishing_checks', undefined, variables.organizationId ?? 'personal'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['activity_logs'] });
     },
   });
 }
@@ -678,6 +770,14 @@ export function useCreateScanSchedule() {
       day_of_month?: number;
       scan_type: 'quick' | 'full';
     }) => {
+      const { data: domainRecord, error: domainError } = await supabase
+        .from('domains')
+        .select('organization_id')
+        .eq('id', schedule.domain_id)
+        .single();
+
+      if (domainError) throw domainError;
+
       // Calculate the next run time based on the schedule configuration
       const nextRunAt = calculateNextRunTime(
         schedule.frequency,
@@ -694,6 +794,7 @@ export function useCreateScanSchedule() {
           day_of_week: schedule.day_of_week ?? null,
           day_of_month: schedule.day_of_month ?? null,
           scan_type: schedule.scan_type,
+          organization_id: domainRecord.organization_id ?? null,
           next_run_at: nextRunAt.toISOString(),
         })
         .select('*, domains(domain)')

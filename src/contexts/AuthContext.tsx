@@ -36,7 +36,11 @@ interface AuthContextType {
   /** Function to sign in with email and password */
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   /** Function to create a new account */
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    metadata?: { fullName?: string; companyName?: string }
+  ) => Promise<{ error: Error | null }>;
   /** Function to sign out the current user */
   signOut: () => Promise<void>;
 }
@@ -138,7 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * @param password - User's password (min 6 characters)
    * @returns Object with error property (null if successful)
    */
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    metadata?: { fullName?: string; companyName?: string }
+  ) => {
     // Configure redirect URL for email confirmation
     const redirectUrl = `${window.location.origin}/dashboard`;
     
@@ -147,6 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         emailRedirectTo: redirectUrl,
+        data: {
+          full_name: metadata?.fullName?.trim() || undefined,
+          company_name: metadata?.companyName?.trim() || undefined,
+        },
       },
     });
     return { error };

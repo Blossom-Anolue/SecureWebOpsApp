@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ScanScheduleCard } from '@/components/settings/ScanScheduleCard';
 import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain } from '@/hooks/useSecurityData';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Settings() {
@@ -20,22 +21,24 @@ export default function Settings() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: notificationSettings, isLoading: notificationsLoading } = useNotificationSettings();
   const { data: domains, isLoading: domainsLoading } = useDomains();
+  const { data: organizations } = useOrganizations();
   const updateProfile = useUpdateProfile();
   const updateNotifications = useUpdateNotificationSettings();
   const addDomain = useAddDomain();
 
-  const [businessName, setBusinessName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyCritical, setNotifyCritical] = useState(true);
   const [notifyWeekly, setNotifyWeekly] = useState(true);
   const [newDomain, setNewDomain] = useState('');
+  const [newDomainScope, setNewDomainScope] = useState<string>('personal');
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
 
   // Initialize form values from fetched data
   useEffect(() => {
     if (profile) {
-      setBusinessName(profile.business_name || '');
+      setCompanyName(profile.company_name || '');
       setIndustry(profile.industry || '');
     }
   }, [profile]);
@@ -58,7 +61,7 @@ export default function Settings() {
     try {
       await Promise.all([
         updateProfile.mutateAsync({
-          business_name: businessName,
+          company_name: companyName,
           industry,
         }),
         updateNotifications.mutateAsync({
@@ -85,8 +88,12 @@ export default function Settings() {
     if (!newDomain.trim()) return;
     
     try {
-      await addDomain.mutateAsync(newDomain);
+      await addDomain.mutateAsync({
+        domain: newDomain,
+        organizationId: newDomainScope === 'personal' ? null : newDomainScope,
+      });
       setNewDomain('');
+      setNewDomainScope('personal');
       setIsAddDomainOpen(false);
       toast({
         title: "Domain added",
@@ -127,10 +134,10 @@ export default function Settings() {
             <div className="space-y-2">
               <Label htmlFor="business-name">Business Name</Label>
               <Input
-                id="business-name"
+               id="business-name"
                 placeholder="Your Business Name"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -173,7 +180,14 @@ export default function Settings() {
             domains.map((domain) => (
               <div key={domain.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
                 <div>
-                  <p className="font-medium">{domain.domain}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{domain.domain}</p>
+                    {domain.organization_id ? (
+                      <Badge variant="outline" className="text-xs">Company</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">Personal</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Added {new Date(domain.created_at).toLocaleDateString()}
                   </p>
@@ -213,6 +227,24 @@ export default function Settings() {
                     onChange={(e) => setNewDomain(e.target.value)}
                   />
                 </div>
+                {organizations && organizations.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="domain-scope">Ownership</Label>
+                    <Select value={newDomainScope} onValueChange={setNewDomainScope}>
+                      <SelectTrigger id="domain-scope">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="personal">Personal</SelectItem>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDomainOpen(false)}>

@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Phish Guard (Gmail + Outlook)",
+    "version": "1.0.0",
+    "description": "Detects likely phishing emails in Gmail and Outlook Web using local heuristic analysis (no data leaves your browser).",
+    "permissions": [],
+    "host_permissions": [
+      "https://mail.google.com/*",
+      "https://outlook.office365.com/*",
+      "https://outlook.office.com/*",
+      "https://outlook.live.com/*"
+    ],
+    "content_scripts": [
+      {
+        "matches": [
+          "https://mail.google.com/*",
+          "https://outlook.office365.com/*",
+          "https://outlook.office.com/*",
+          "https://outlook.live.com/*"
+        ],
+        "js": ["rules.js", "content.js"],
+        "css": ["styles.css"],
+        "run_at": "document_idle"
+      }
+    ],
+    "icons": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }

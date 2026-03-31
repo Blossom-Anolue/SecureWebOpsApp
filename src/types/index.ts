@@ -2,7 +2,7 @@ export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low';
 
 export type ScoreTier = 'ok' | 'at-risk' | 'critical';
 
-export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type ScanStatus = 'queued' | 'pending' | 'running' | 'completed' | 'failed' | 'canceled';
 
 export type ScanType = 'quick' | 'full';
 

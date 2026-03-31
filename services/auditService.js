@@ -13,7 +13,7 @@ const FALLBACK_AUDIT_TABLE = process.env.AUDIT_LOG_FALLBACK_TABLE || '';
 const SYSTEM_AUDIT_USER_ID = process.env.SYSTEM_AUDIT_USER_ID || '00000000-0000-0000-0000-000000000000';
 
 export const logEvent = async (eventData) => {
-    const { action, fileName, user, status, ip, details } = eventData;
+    const { action, fileName, user, userId, organizationId, status, ip, details } = eventData;
 
     const primaryPayload = [{
         action_type: action,
@@ -38,7 +38,8 @@ export const logEvent = async (eventData) => {
     }
 
     const fallbackPayload = [{
-        user_id: SYSTEM_AUDIT_USER_ID,
+        user_id: userId || SYSTEM_AUDIT_USER_ID,
+        organization_id: organizationId || null,
         action: action,
         resource_type: 'encrypted_pdf',
         details: {

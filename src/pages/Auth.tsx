@@ -16,7 +16,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
+import { Shield, Mail, Lock, Loader2, Building2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,11 @@ const authSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+const signUpSchema = authSchema.extend({
+  fullName: z.string().trim().min(2, 'Please enter your name'),
+  companyName: z.string().trim().optional(),
+});
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -60,8 +65,10 @@ export default function Auth() {
   const [activeTab, setActiveTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
 
   /**
    * Redirect to dashboard if user is already logged in.
@@ -79,18 +86,22 @@ export default function Auth() {
    * 
    * @returns true if valid, false otherwise
    */
-  const validateForm = () => {
+  const validateForm = (mode: 'signin' | 'signup') => {
     try {
-      authSchema.parse({ email, password });
+      if (mode === 'signup') {
+        signUpSchema.parse({ email, password, fullName, companyName });
+      } else {
+        authSchema.parse({ email, password });
+      }
       setErrors({});
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        // Map Zod errors to our error state format
-        const fieldErrors: { email?: string; password?: string } = {};
+        const fieldErrors: { email?: string; password?: string; fullName?: string } = {};
         error.errors.forEach((err) => {
           if (err.path[0] === 'email') fieldErrors.email = err.message;
           if (err.path[0] === 'password') fieldErrors.password = err.message;
+          if (err.path[0] === 'fullName') fieldErrors.fullName = err.message;
         });
         setErrors(fieldErrors);
       }
@@ -104,7 +115,7 @@ export default function Auth() {
    */
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm('signin')) return;
 
     setIsSubmitting(true);
     const { error } = await signIn(email, password);
@@ -140,10 +151,10 @@ export default function Auth() {
    */
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm('signup')) return;
 
     setIsSubmitting(true);
-    const { error } = await signUp(email, password);
+    const { error } = await signUp(email, password, { fullName, companyName });
     setIsSubmitting(false);
 
     if (error) {
@@ -273,6 +284,65 @@ export default function Auth() {
               {/* ============================================================ */}
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Choose how you want to start</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        You can create a personal account first, or create a company workspace that other teammates can join.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-md border bg-background p-3">
+                        <p className="text-sm font-medium">Personal account</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Leave company name blank. Only your own domains and personal work stay under your account.
+                        </p>
+                      </div>
+
+                      <div className="rounded-md border bg-background p-3">
+                        <p className="text-sm font-medium">Company workspace</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Add a company name. We will create a team workspace and make you the company owner.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-full-name">Your Name</Label>
+                    <div className="relative">
+                      <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-full-name"
+                        type="text"
+                        placeholder="Jane Doe"
+                        className="pl-10"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                      />
+                    </div>
+                    {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-company-name">Company Name</Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-company-name"
+                        type="text"
+                        placeholder="Acme Inc. (optional)"
+                        className="pl-10"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Leave this blank for a personal account, or fill it in to create a company workspace.
+                    </p>
+                  </div>
+
                   {/* Email field */}
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
@@ -316,7 +386,7 @@ export default function Auth() {
                         Creating account...
                       </>
                     ) : (
-                      'Create Account'
+                      companyName.trim() ? 'Create Company Workspace' : 'Create Personal Account'
                     )}
                   </Button>
                 </form>

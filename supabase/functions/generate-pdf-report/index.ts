@@ -17,6 +17,39 @@ interface ScanIssue {
   owasp_category?: string;
 }
 
+async function userCanAccessScan(supabase: ReturnType<typeof createClient>, userId: string, scanId: string) {
+  const { data: scan, error } = await supabase
+    .from("scans")
+    .select("*")
+    .eq("id", scanId)
+    .single();
+
+  if (error || !scan) {
+    return { error: "Scan not found" };
+  }
+
+  if (scan.user_id === userId) {
+    return { scan };
+  }
+
+  if (!scan.organization_id) {
+    return { error: "Scan not found" };
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("organization_id", scan.organization_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipError || !membership) {
+    return { error: "Scan not found" };
+  }
+
+  return { scan };
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -185,29 +218,27 @@ serve(async (req) => {
 
     console.log(`Generating PDF report for scan: ${scanId}`);
 
-    // Fetch scan details
-    const { data: scan, error: scanError } = await supabase
-      .from("scans")
-      .select("*")
-      .eq("id", scanId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (scanError || !scan) {
-      console.error("Scan fetch error:", scanError);
+    const access = await userCanAccessScan(supabase, user.id, scanId);
+    if (access.error || !access.scan) {
+      console.error("Scan fetch error:", access.error);
       return new Response(JSON.stringify({ error: "Scan not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
+    const scan = access.scan;
 
-    // Fetch scan issues
-    const { data: issues, error: issuesError } = await supabase
+    let issuesQuery = supabase
       .from("scan_issues")
       .select("*")
       .eq("scan_id", scanId)
-      .eq("user_id", user.id)
       .order("severity", { ascending: true });
+
+    issuesQuery = scan.organization_id
+      ? issuesQuery
+      : issuesQuery.eq("user_id", user.id);
+
+    const { data: issues, error: issuesError } = await issuesQuery;
 
     if (issuesError) {
       console.error("Issues fetch error:", issuesError);

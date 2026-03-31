@@ -112,6 +112,7 @@ export default function ActivityLogPage() {
                   <SelectItem value="domain.added">Domains Added</SelectItem>
                   <SelectItem value="member.invited">Members Invited</SelectItem>
                   <SelectItem value="member.role_changed">Role Changes</SelectItem>
+                  <SelectItem value="phishing.checked">Phishing Checks</SelectItem>
                   <SelectItem value="settings.updated">Settings Updates</SelectItem>
                 </SelectContent>
               </Select>

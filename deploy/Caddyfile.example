@@ -1,0 +1,4 @@
+api.securewebops.gannon.link {
+    encode gzip
+    reverse_proxy localhost:3000
+}

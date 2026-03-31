@@ -25,7 +25,7 @@ export default function ScanDetail() {
 
   // Poll for updates while scan is running
   useEffect(() => {
-    if (scan?.status === 'pending' || scan?.status === 'running') {
+    if (scan?.status === 'queued' || scan?.status === 'pending' || scan?.status === 'running') {
       const interval = setInterval(() => {
         refetch();
       }, 3000);
@@ -105,7 +105,8 @@ export default function ScanDetail() {
     });
   };
 
-  const isScanning = scan.status === 'pending' || scan.status === 'running';
+  const isScanning = scan.status === 'queued' || scan.status === 'pending' || scan.status === 'running';
+  const scanTimestamp = scan.started_at ?? scan.created_at ?? null;
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
@@ -149,12 +150,12 @@ export default function ScanDetail() {
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  {format(new Date(scan.started_at), 'MMM d, yyyy · h:mm a')}
+                  {scanTimestamp ? format(new Date(scanTimestamp), 'MMM d, yyyy · h:mm a') : 'Waiting to start'}
                 </span>
                 {isScanning ? (
                   <span className="flex items-center gap-1 text-primary">
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Scanning...
+                    {scan.status === 'queued' ? 'Queued...' : 'Scanning...'}
                   </span>
                 ) : scan.status === 'completed' ? (
                   <span className="flex items-center gap-1 text-score-ok">
@@ -200,11 +201,11 @@ export default function ScanDetail() {
 
           {/* Scanning message */}
           {isScanning && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                AI is analyzing your website for security vulnerabilities. This usually takes 1-2 minutes for quick scans.
-              </p>
-            </div>
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  SecureWebOps is running a hosted website security assessment and live health check. Quick scans usually finish faster than full scans.
+                </p>
+              </div>
           )}
         </CardContent>
       </Card>
@@ -315,7 +316,7 @@ export default function ScanDetail() {
             <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
             <h3 className="font-semibold text-lg">Scan failed</h3>
             <p className="text-muted-foreground mt-1 mb-4">
-              Something went wrong while scanning your website. Please try again.
+              {scan.scan_error || 'Something went wrong while scanning your website. Please try again.'}
             </p>
             <Button onClick={() => navigate('/scans/new')}>
               Start New Scan

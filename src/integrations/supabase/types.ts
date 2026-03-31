@@ -135,7 +135,7 @@ export type Database = {
           joined_at: string | null
           organization_id: string
           role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -145,7 +145,7 @@ export type Database = {
           joined_at?: string | null
           organization_id: string
           role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -155,7 +155,7 @@ export type Database = {
           joined_at?: string | null
           organization_id?: string
           role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -196,39 +196,56 @@ export type Database = {
       }
       phishing_checks: {
         Row: {
+          analysis_source: string
           check_type: Database["public"]["Enums"]["phishing_check_type"]
           checked_at: string
           content: string
           id: string
+          organization_id: string | null
           risk_level: Database["public"]["Enums"]["phishing_risk_level"]
+          risk_score: number | null
           sender_email: string | null
           subject: string | null
           user_id: string
           verdict: string
         }
         Insert: {
+          analysis_source?: string
           check_type: Database["public"]["Enums"]["phishing_check_type"]
           checked_at?: string
           content: string
           id?: string
+          organization_id?: string | null
           risk_level: Database["public"]["Enums"]["phishing_risk_level"]
+          risk_score?: number | null
           sender_email?: string | null
           subject?: string | null
           user_id: string
           verdict: string
         }
         Update: {
+          analysis_source?: string
           check_type?: Database["public"]["Enums"]["phishing_check_type"]
           checked_at?: string
           content?: string
           id?: string
+          organization_id?: string | null
           risk_level?: Database["public"]["Enums"]["phishing_risk_level"]
+          risk_score?: number | null
           sender_email?: string | null
           subject?: string | null
           user_id?: string
           verdict?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "phishing_checks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       phishing_red_flags: {
         Row: {
@@ -267,22 +284,25 @@ export type Database = {
       }
       profiles: {
         Row: {
-          business_name: string | null
+          company_name: string | null
           created_at: string
+          full_name: string | null
           id: string
           industry: string | null
           updated_at: string
         }
         Insert: {
-          business_name?: string | null
+          company_name?: string | null
           created_at?: string
+          full_name?: string | null
           id: string
           industry?: string | null
           updated_at?: string
         }
         Update: {
-          business_name?: string | null
+          company_name?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
           industry?: string | null
           updated_at?: string
@@ -518,7 +538,7 @@ export type Database = {
       app_role: "owner" | "admin" | "member" | "viewer"
       phishing_check_type: "email" | "link"
       phishing_risk_level: "high" | "medium" | "low"
-      scan_status: "pending" | "running" | "completed" | "failed"
+      scan_status: "pending" | "running" | "completed" | "failed" | "queued" | "canceled"
       scan_type: "quick" | "full"
       severity_level: "critical" | "high" | "medium" | "low"
     }
@@ -651,7 +671,7 @@ export const Constants = {
       app_role: ["owner", "admin", "member", "viewer"],
       phishing_check_type: ["email", "link"],
       phishing_risk_level: ["high", "medium", "low"],
-      scan_status: ["pending", "running", "completed", "failed"],
+      scan_status: ["pending", "running", "completed", "failed", "queued", "canceled"],
       scan_type: ["quick", "full"],
       severity_level: ["critical", "high", "medium", "low"],
     },

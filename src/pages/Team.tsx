@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye, MailCheck, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,11 @@ import { useActivityLogger } from '@/hooks/useActivityLog';
 import {
   useOrganizations,
   useOrganizationMembers,
+  usePendingInvites,
   useCreateOrganization,
   useInviteMember,
+  useAcceptInvite,
+  useDeclineInvite,
   useUpdateMemberRole,
   useRemoveMember,
   useCurrentUserRole,
@@ -36,6 +39,7 @@ export default function Team() {
   const { user } = useAuth();
   const { log } = useActivityLogger();
   const { data: organizations, isLoading: orgsLoading } = useOrganizations();
+  const { data: pendingInvites, isLoading: invitesLoading } = usePendingInvites();
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   
   const selectedOrg = organizations?.find(o => o.id === selectedOrgId) || organizations?.[0];
@@ -44,6 +48,8 @@ export default function Team() {
   
   const createOrg = useCreateOrganization();
   const inviteMember = useInviteMember();
+  const acceptInvite = useAcceptInvite();
+  const declineInvite = useDeclineInvite();
   const updateRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
 
@@ -54,6 +60,53 @@ export default function Team() {
   const [inviteRole, setInviteRole] = useState<AppRole>('member');
 
   const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
+
+  const handleAcceptInvite = async (member: OrganizationMember) => {
+    try {
+      await acceptInvite.mutateAsync({
+        membershipId: member.id,
+        organizationId: member.organization_id,
+      });
+
+      log('member.joined', 'member', {
+        resourceId: member.id,
+        organizationId: member.organization_id,
+        details: { email: user?.email, role: member.role },
+      });
+
+      setSelectedOrgId(member.organization_id);
+      toast({
+        title: 'Invitation accepted',
+        description: `You joined ${member.organizations?.name || 'the team'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to accept invitation.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeclineInvite = async (member: OrganizationMember) => {
+    try {
+      await declineInvite.mutateAsync({
+        membershipId: member.id,
+        organizationId: member.organization_id,
+      });
+
+      toast({
+        title: 'Invitation declined',
+        description: `Removed invite to ${member.organizations?.name || 'the team'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to decline invitation.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleCreateOrg = async () => {
     if (!newOrgName.trim()) return;
@@ -179,7 +232,7 @@ export default function Team() {
     return <LoadingState message="Loading teams..." />;
   }
 
-  if (!organizations || organizations.length === 0) {
+  if ((!organizations || organizations.length === 0) && (!pendingInvites || pendingInvites.length === 0) && !invitesLoading) {
     return (
       <div className="space-y-6 pb-20 lg:pb-0">
         <div>
@@ -287,8 +340,62 @@ export default function Team() {
         </Dialog>
       </div>
 
+      {!!pendingInvites?.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MailCheck className="w-5 h-5" />
+              Your Invitations
+            </CardTitle>
+            <CardDescription>
+              Join a company workspace with one click. This is how personal accounts move into a team without losing the shared multitenant setup.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInvites.map((invite) => (
+              <div key={invite.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{invite.organizations?.name || 'Company workspace'}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Badge variant="secondary" className="text-xs">
+                      {ROLE_CONFIG[invite.role].label}
+                    </Badge>
+                    <span>Invited as {invite.invited_email}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sent {invite.invited_at ? new Date(invite.invited_at).toLocaleString() : 'recently'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDeclineInvite(invite)}
+                    disabled={declineInvite.isPending}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    onClick={() => handleAcceptInvite(invite)}
+                    disabled={acceptInvite.isPending}
+                  >
+                    {acceptInvite.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Joining...
+                      </>
+                    ) : (
+                      'Accept Invite'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Team Selector */}
-      {organizations.length > 1 && (
+      {!!organizations?.length && organizations.length > 1 && (
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
@@ -314,6 +421,7 @@ export default function Team() {
       )}
 
       {/* Team Info */}
+      {!!selectedOrg && (
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -411,7 +519,7 @@ export default function Team() {
                         <p className="font-medium">
                           {isPending 
                             ? member.invited_email 
-                            : user?.email || 'Team Member'
+                            : member.invited_email || `User ${member.user_id?.slice(0, 8) || 'member'}`
                           }
                           {isCurrentUser && (
                             <span className="text-xs text-muted-foreground ml-2">(you)</span>
@@ -462,6 +570,7 @@ export default function Team() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Permissions Info */}
       <Card>
@@ -483,9 +592,9 @@ export default function Team() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {role === 'owner' && 'Full control including team deletion'}
-                    {role === 'admin' && 'Manage team members and settings'}
-                    {role === 'member' && 'Run scans and view all data'}
-                    {role === 'viewer' && 'View-only access to reports'}
+                    {role === 'admin' && 'Manage team members, company domains, and view company-wide scans'}
+                    {role === 'member' && 'Run scans, join company workspaces, and view only your own scan results'}
+                    {role === 'viewer' && 'Read-only access to company-wide scans and reports'}
                   </p>
                 </div>
               );
@@ -493,6 +602,22 @@ export default function Team() {
           </div>
         </CardContent>
       </Card>
+
+      {!selectedOrg && !pendingInvites?.length && (
+        <Card>
+          <CardContent className="py-10">
+            <div className="flex flex-col items-center justify-center text-center gap-3">
+              <Inbox className="w-10 h-10 text-muted-foreground" />
+              <div>
+                <p className="font-medium">No team selected yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Create a company workspace or accept an invitation to collaborate under one shared multitenant environment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
