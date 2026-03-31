@@ -18,6 +18,26 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const SCAN_TRIGGER_URL = import.meta.env.VITE_SCAN_TRIGGER_URL || '/api/scans/trigger';
 
+function toErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+
+  if (error && typeof error === 'object') {
+    const maybeMessage = 'message' in error ? error.message : null;
+    const maybeDetails = 'details' in error ? error.details : null;
+    const maybeHint = 'hint' in error ? error.hint : null;
+
+    const parts = [maybeMessage, maybeDetails, maybeHint]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+  }
+
+  return fallback;
+}
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -412,7 +432,9 @@ export function useCreateScan() {
         .eq('id', domainId)
         .single();
 
-      if (domainError) throw domainError;
+      if (domainError) {
+        throw new Error(toErrorMessage(domainError, 'Failed to load the selected domain'));
+      }
 
       // Step 1: Create the scan record in the database with 'pending' status
       const { data, error } = await supabase
@@ -428,7 +450,9 @@ export function useCreateScan() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        throw new Error(toErrorMessage(error, 'Failed to create the scan record'));
+      }
       
       // Step 2: Trigger the Node backend scanner asynchronously so it can reach the private ZAP host.
       const scanData = data as Scan;

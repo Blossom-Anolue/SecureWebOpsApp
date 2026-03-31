@@ -14,6 +14,26 @@ import { useDomains, useCreateScan } from '@/hooks/useSecurityData';
 import { useActivityLogger } from '@/hooks/useActivityLog';
 import { Shield } from 'lucide-react';
 
+function getReadableError(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+
+  if (error && typeof error === 'object') {
+    const message = 'message' in error ? error.message : null;
+    const details = 'details' in error ? error.details : null;
+    const hint = 'hint' in error ? error.hint : null;
+
+    const parts = [message, details, hint]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+  }
+
+  return "Failed to start scan. Please try again.";
+}
+
 export default function NewScan() {
   const navigate = useNavigate();
   const { data: domains, isLoading } = useDomains();
@@ -79,7 +99,7 @@ export default function NewScan() {
       console.error('Failed to start scan:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to start scan. Please try again.",
+        description: getReadableError(error),
         variant: "destructive",
       });
     }
