@@ -21,7 +21,7 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Plus } from 'lucide-react';
+import { Shield, Mail, Puzzle, Download, ExternalLink } from 'lucide-react';
 import { SecurityScore } from '@/components/dashboard/SecurityScore';
 import { StatusCard } from '@/components/dashboard/StatusCard';
 import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
@@ -43,6 +43,7 @@ import type { SecurityScore as SecurityScoreType } from '@/types';
  */
 export default function Dashboard() {
   const navigate = useNavigate();
+  const extensionDownloadUrl = '/downloads/securewebops-extension.zip';
   
   // Fetch all required data in parallel
   const { data: scans, isLoading: scansLoading } = useScans();
@@ -124,6 +125,45 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl lg:text-3xl font-bold font-display">Security Dashboard</h1>
         <p className="text-muted-foreground mt-1">Your business security at a glance</p>
+      </div>
+
+      <div className="rounded-xl border bg-card shadow-card p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Puzzle className="h-5 w-5" />
+          </div>
+          <div className="flex-1 space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold">Install The Browser Extension</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add the SecureWebOps Scanner extension to test quick website scans and Gmail or Outlook phishing checks.
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
+              <p>How to test it:</p>
+              <p>1. Download the zip below and extract it.</p>
+              <p>2. Open `chrome://extensions` or `edge://extensions`.</p>
+              <p>3. Turn on Developer mode and choose Load unpacked.</p>
+              <p>4. Select the extracted `extension` folder, then sign in from the popup.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={extensionDownloadUrl}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                <Download className="h-4 w-4" />
+                Download Extension
+              </a>
+              <button
+                onClick={() => navigate('/phishing/check')}
+                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Test Phishing Page
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ================================================================== */}

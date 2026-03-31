@@ -435,7 +435,7 @@ export function useCreateScan() {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
-      fetch(SCAN_TRIGGER_URL, {
+      const triggerResponse = await fetch(SCAN_TRIGGER_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -446,15 +446,25 @@ export function useCreateScan() {
           domain,
           scanType,
         }),
-      }).then(async (response) => {
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || 'Failed to trigger backend scan');
-        }
-      }).catch(err => {
-        // Log error but don't fail - scan status will show 'failed' in DB
-        console.error('Error triggering backend security scan:', err);
       });
+
+      if (!triggerResponse.ok) {
+        const payload = await triggerResponse.json().catch(() => null);
+        const triggerMessage =
+          payload?.error?.message ||
+          payload?.error ||
+          'Failed to trigger backend scan';
+
+        await supabase
+          .from('scans')
+          .update({
+            status: 'failed',
+            scan_error: triggerMessage,
+          })
+          .eq('id', scanData.id);
+
+        throw new Error(triggerMessage);
+      }
       
       return scanData;
     },

@@ -76,9 +76,10 @@ export default function NewScan() {
       });
       navigate('/scans');
     } catch (error) {
+      console.error('Failed to start scan:', error);
       toast({
         title: "Error",
-        description: "Failed to start scan. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to start scan. Please try again.",
         variant: "destructive",
       });
     }

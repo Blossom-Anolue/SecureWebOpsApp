@@ -15,6 +15,7 @@ const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL?.trim() || null;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, 'dist');
+const extensionZipPath = path.join(__dirname, 'securewebops-extension.zip');
 
 app.use(cors());
 app.use(express.json());
@@ -30,6 +31,10 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     message: 'SecureWebOps backend is running',
   });
+});
+
+app.get('/downloads/securewebops-extension.zip', (_req, res) => {
+  return res.download(extensionZipPath, 'securewebops-extension.zip');
 });
 
 app.use(express.static(distPath));
