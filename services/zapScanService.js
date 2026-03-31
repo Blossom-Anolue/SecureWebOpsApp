@@ -1008,6 +1008,7 @@ async function persistScanArtifacts(scanId, userId, summary, findings) {
 }
 
 export async function processScan(scanId, target) {
+  console.log(`[SCAN] Starting processing for ${scanId} -> ${target}`);
   const { data: scanMeta } = await supabaseAdmin
     .from('scans')
     .select('user_id,organization_id,scan_type')
@@ -1025,6 +1026,7 @@ export async function processScan(scanId, target) {
     .limit(MAX_CONCURRENT_SCANS + 1);
 
   if ((concurrentScans?.length ?? 0) >= MAX_CONCURRENT_SCANS) {
+      console.error(`[SCAN] ${scanId} blocked by concurrency limit`);
       await supabaseAdmin
         .from('scans')
         .update({
@@ -1055,9 +1057,11 @@ export async function processScan(scanId, target) {
       scan_error: null,
     })
     .eq('id', scanId);
+  console.log(`[SCAN] ${scanId} marked running`);
 
   try {
     const { summary, findings } = await runZapSecurityScan(target, scanType);
+    console.log(`[SCAN] ${scanId} completed scan engine run with ${findings.length} findings`);
 
     await persistScanArtifacts(scanId, scanMeta?.user_id ?? null, summary, findings);
 
@@ -1075,6 +1079,7 @@ export async function processScan(scanId, target) {
         scan_error: null,
       })
       .eq('id', scanId);
+    console.log(`[SCAN] ${scanId} marked completed with score ${summary.score}`);
 
     logScanActivitySafely({
       userId: scanMeta?.user_id ?? null,
@@ -1086,6 +1091,7 @@ export async function processScan(scanId, target) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Scan failed';
+    console.error(`[SCAN] ${scanId} failed: ${message}`);
     await supabaseAdmin
       .from('scans')
       .update({
