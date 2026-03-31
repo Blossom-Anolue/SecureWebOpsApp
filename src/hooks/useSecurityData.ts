@@ -220,6 +220,8 @@ export interface SecurityScore {
   score: number;
   /** Timestamp when this score was recorded */
   recorded_at: string;
+  /** Origin of the score record if present */
+  source?: string | null;
 }
 
 /**
@@ -445,6 +447,7 @@ export function useCreateScan() {
           domain,
           organization_id: domainRecord.organization_id ?? null,
           scan_type: scanType,
+          source: 'dashboard',
           status: 'pending',
         })
         .select()
