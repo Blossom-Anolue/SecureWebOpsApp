@@ -1020,10 +1020,11 @@ export async function processScan(scanId, target) {
   const { data: concurrentScans } = await supabaseAdmin
     .from('scans')
     .select('id', { count: 'exact' })
-    .in('status', ['running', 'queued'])
+    .eq('status', 'running')
+    .neq('id', scanId)
     .limit(MAX_CONCURRENT_SCANS + 1);
 
-  if ((concurrentScans?.length ?? 0) > MAX_CONCURRENT_SCANS) {
+  if ((concurrentScans?.length ?? 0) >= MAX_CONCURRENT_SCANS) {
       await supabaseAdmin
         .from('scans')
         .update({
@@ -1123,6 +1124,7 @@ export async function createAndStartScan({
       requested_by_user: requestedByUser,
       organization_id: organizationId,
       scan_type: scanType === 'full' ? 'full' : 'quick',
+      source,
       user_id: requestedByUser,
       domain_id: null,
     })
