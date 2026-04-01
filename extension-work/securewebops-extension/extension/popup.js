@@ -1,6 +1,6 @@
 const CONFIG = {
-  apiBaseUrl: "http://localhost:3000",
-  appBaseUrl: "http://localhost:8080",
+  apiBaseUrl: "http://172.20.0.220:3000",
+  appBaseUrl: "http://172.20.0.220:3000",
   supabaseUrl: "https://culznwivxwtvrmohstht.supabase.co",
   supabasePublishableKey: "sb_publishable_m_7Q5T4ZLLuFsiZK7-N1xw_V7KbRTBx",
   projectId: "culznwivxwtvrmohstht",
