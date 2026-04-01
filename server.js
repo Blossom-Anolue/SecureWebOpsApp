@@ -49,7 +49,10 @@ app.get(/.*/, (req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[SUCCESS] Server started on port ${PORT}`);
   console.log('Server is globally accessible on the network.');
+
   if (publicApiBaseUrl) {
     console.log(`Public API base URL: ${publicApiBaseUrl}`);
   }
+
+  console.log(`[ENV] ZAP_API_BASE_URL = ${process.env.ZAP_API_BASE_URL || '(not set)'}`);
 });

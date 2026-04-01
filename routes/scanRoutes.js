@@ -148,10 +148,13 @@ async function handlePublicScanRequest(req, res) {
 publicScanRouter.post('/scan', handlePublicScanRequest);
 
 router.post('/trigger', async (req, res) => {
-  const { scanId, domain } = req.body ?? {};
+  const { scanId, url, domain } = req.body ?? {};
+  const rawTarget = String(url || domain || '').trim();
 
-  if (!scanId || !domain) {
-    return res.status(400).json({ error: 'scanId and domain are required' });
+  console.log('[TRIGGER] incoming:', { scanId, url, domain, rawTarget });
+
+  if (!scanId || !rawTarget) {
+    return res.status(400).json({ error: 'scanId and url are required' });
   }
 
   if (!checkRateLimit(getClientIp(req))) {
@@ -168,12 +171,18 @@ router.post('/trigger', async (req, res) => {
     return jsonError(res, scanAccess.error.status, scanAccess.error.code, scanAccess.error.message);
   }
 
-  const normalizedTarget = domain.startsWith('http://') || domain.startsWith('https://')
-    ? domain
-    : `https://${domain}`;
+  const normalizedTarget = rawTarget.startsWith('http://') || rawTarget.startsWith('https://')
+    ? rawTarget
+    : `https://${rawTarget}`;
+  
+  console.log('[TRIGGER] normalizedTarget:', normalizedTarget);
 
   try {
+    console.log('[TRIGGER] validating target...');
     const validatedTarget = await validateTargetUrl(normalizedTarget);
+    console.log('[TRIGGER] validatedTarget:', validatedTarget);
+
+    console.log('[TRIGGER] updating scan to queued:', scanId);
 
     await supabaseAdmin
       .from('scans')

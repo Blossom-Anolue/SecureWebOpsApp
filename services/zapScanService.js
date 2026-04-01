@@ -132,6 +132,7 @@ async function withTimeout(url, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
 
 function getZapConfig() {
   const baseUrl = process.env.ZAP_API_BASE_URL?.trim();
+  console.log('[ZAP CONFIG] raw baseUrl =', process.env.ZAP_API_BASE_URL);
   if (!baseUrl) {
     throw new Error('Missing ZAP_API_BASE_URL');
   }
@@ -140,7 +141,11 @@ function getZapConfig() {
     baseUrl: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
     apiKey: process.env.ZAP_API_KEY?.trim() ?? '',
     pollIntervalMs: Number(process.env.ZAP_POLL_INTERVAL_MS ?? '2000'),
-    maxRuntimeMs: Number(process.env.ZAP_MAX_RUNTIME_MS ?? '300000'),
+
+    spiderTimeoutMs: Number(process.env.ZAP_SPIDER_TIMEOUT_MS ?? '120000'),
+    passiveTimeoutMs: Number(process.env.ZAP_PASSIVE_TIMEOUT_MS ?? '180000'),
+    activeTimeoutMs: Number(process.env.ZAP_ACTIVE_TIMEOUT_MS ?? '600000'),
+
     quickMaxChildren: Number(process.env.ZAP_QUICK_MAX_CHILDREN ?? '25'),
     fullMaxChildren: Number(process.env.ZAP_FULL_MAX_CHILDREN ?? '200'),
   };
@@ -214,23 +219,31 @@ async function waitForPassiveScan(timeoutMs, pollIntervalMs) {
 
 async function startSpiderScan(target, scanType) {
   const config = getZapConfig();
+
+  console.log('[ZAP] spider target:', target);
+  console.log('[ZAP] spider scanType:', scanType);
+  console.log('[ZAP] spider config baseUrl:', config.baseUrl);
+
   const result = await zapGet('JSON/spider/action/scan/', {
     url: target,
     recurse: true,
-    subtreeOnly: true,
     maxChildren: scanType === 'quick' ? config.quickMaxChildren : config.fullMaxChildren,
   });
 
+  console.log('[ZAP] spider start result:', result);
+
   if (!result.scan) {
-    throw new Error('ZAP spider did not return a scan id');
+    throw new Error(`ZAP spider did not return a scan id: ${JSON.stringify(result)}`);
   }
 
   return result.scan;
 }
 
 async function startActiveScan(target) {
+  const scanTarget = new URL(target).origin;
+
   const result = await zapGet('JSON/ascan/action/scan/', {
-    url: target,
+    url: scanTarget,
     recurse: true,
     inScopeOnly: false,
   });
@@ -248,10 +261,11 @@ async function fetchAllAlerts(target) {
 
   while (true) {
     const page = await zapGet('JSON/core/view/alerts/', {
-      baseurl: target,
-      start,
-      count: ZAP_ALERT_PAGE_SIZE,
-    });
+    start,
+    count: ZAP_ALERT_PAGE_SIZE,
+  });
+
+    console.log('[ZAP] alerts page raw:', page);
 
     const alerts = page.alerts ?? [];
     allAlerts.push(...alerts);
@@ -893,36 +907,71 @@ async function runZapSecurityScan(target, scanType) {
   }
 
   const config = getZapConfig();
+
+  await zapGet('JSON/core/action/newSession/', {
+    name: `scan-${Date.now()}`,
+    overwrite: true,
+  });
+
+  // Prime ZAP with the target so it exists in the Sites Tree
+  try {
+    const primeResult = await zapGet('JSON/core/action/accessUrl/', {
+      url: target,
+    });
+    console.log('[ZAP] accessUrl result:', primeResult);
+  } catch (error) {
+    console.warn('[ZAP] accessUrl failed, continuing without priming:', error.message);
+  }
+
   const spiderScanId = await startSpiderScan(target, scanType);
 
+  // 🕷️ Spider
   await waitForPercentage(
     'ZAP spider scan',
     async () => {
       const result = await zapGet('JSON/spider/view/status/', { scanId: spiderScanId });
-      return Number(result.status ?? '0');
+      console.log('[ZAP] spider status raw:', result);
+      const percentage = Number(result.status ?? '0');
+      console.log(`[ZAP] Spider progress: ${percentage}%`);
+      return percentage;
     },
-    config.maxRuntimeMs,
+    config.spiderTimeoutMs,
     config.pollIntervalMs
   );
 
-  await waitForPassiveScan(config.maxRuntimeMs, config.pollIntervalMs);
+  // 🧠 Passive scan
+  await waitForPassiveScan(
+    config.passiveTimeoutMs,
+    config.pollIntervalMs
+  );
 
+  // ⚡ Active scan (FULL only)
   if (scanType === 'full') {
     const activeScanId = await startActiveScan(target);
+
     await waitForPercentage(
       'ZAP active scan',
       async () => {
         const result = await zapGet('JSON/ascan/view/status/', { scanId: activeScanId });
-        return Number(result.status ?? '0');
+        const percentage = Number(result.status ?? '0');
+        console.log('[ZAP] Active scan progress:', percentage + '%');
+        return percentage;
       },
-      config.maxRuntimeMs,
+      config.activeTimeoutMs,
       config.pollIntervalMs
     );
-    await waitForPassiveScan(config.maxRuntimeMs, config.pollIntervalMs);
+
+    await waitForPassiveScan(
+      config.passiveTimeoutMs,
+      config.pollIntervalMs
+    );
   }
 
   const alerts = await fetchAllAlerts(target);
+  console.log('[ZAP] raw alerts count:', Array.isArray(alerts) ? alerts.length : 'not-array');
+  console.log('[ZAP] raw alerts preview:', Array.isArray(alerts) ? alerts.slice(0, 3) : alerts);
   const findings = dedupeAlerts(alerts);
+  console.log('[ZAP] deduped findings count:', findings.length);
   const summary = summarizeFindings(findings, scanType, target);
 
   return { summary, findings };

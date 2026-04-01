@@ -447,7 +447,7 @@ export function useCreateScan() {
           domain,
           organization_id: domainRecord.organization_id ?? null,
           scan_type: scanType,
-          source: 'node_api',
+          source: 'website',
           status: 'pending',
         })
         .select()
