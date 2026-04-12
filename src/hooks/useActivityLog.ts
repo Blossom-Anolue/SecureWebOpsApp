@@ -42,7 +42,15 @@ export type ActivityAction =
   | 'member.role_changed' // Team member's role was changed
   | 'phishing.checked'    // User performed a phishing check
   | 'report.downloaded'   // User downloaded a PDF report
-  | 'settings.updated';   // User updated their settings
+  | 'settings.updated'    // User updated their settings
+  | 'UPLOAD_ATTEMPT'
+  | 'FILE_ENCRYPTED_STORED'
+  | 'FILE_DECRYPT_SUCCESS'
+  | 'FILE_DECRYPT_FAILURE'
+  | 'ACCESS_GRANTED'
+  | 'FILE_PURGED'
+  | 'UNAUTHORIZED_ACCESS'
+  | 'UNAUTHORIZED_ACCESS_ATTEMPT';
 
 /**
  * Types of resources that can have activities logged against them.
@@ -55,7 +63,8 @@ export type ResourceType =
   | 'member'
   | 'phishing_check'
   | 'report'
-  | 'settings';
+  | 'settings'
+  | 'file';
 
 /**
  * Represents a single activity log entry.

@@ -78,12 +78,14 @@ export default function Team() {
       toast({
         title: 'Invitation accepted',
         description: `You joined ${member.organizations?.name || 'the team'}.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to accept invitation.',
         variant: 'destructive',
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -98,12 +100,14 @@ export default function Team() {
       toast({
         title: 'Invitation declined',
         description: `Removed invite to ${member.organizations?.name || 'the team'}.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to decline invitation.',
         variant: 'destructive',
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -128,6 +132,7 @@ export default function Team() {
       toast({
         title: "Team created",
         description: `${newOrgName} has been created successfully.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error: any) {
       toast({
@@ -136,6 +141,7 @@ export default function Team() {
           ? "A team with this name already exists."
           : "Failed to create team.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -160,6 +166,7 @@ export default function Team() {
       toast({
         title: "Invitation sent",
         description: `Invited ${inviteEmail} as ${ROLE_CONFIG[inviteRole].label}.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error: any) {
       toast({
@@ -168,6 +175,7 @@ export default function Team() {
           ? "This user is already a member."
           : "Failed to send invitation.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -191,12 +199,14 @@ export default function Team() {
       toast({
         title: "Role updated",
         description: `Updated role to ${ROLE_CONFIG[newRole].label}.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update role.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -218,12 +228,14 @@ export default function Team() {
       toast({
         title: "Member removed",
         description: "The team member has been removed.",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to remove member.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };

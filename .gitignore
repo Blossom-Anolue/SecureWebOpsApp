@@ -7,10 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
 supabase/.temp/
 
 # Editor directories and files
@@ -18,8 +20,23 @@ supabase/.temp/
 !.vscode/extensions.json
 .idea
 .DS_Store
+*.local
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (Keep these secret!)
+.env
+.env.local
+.env.*.local
+
+# Local debug and helper artifacts
+dummy.pdf
+pdfRoutesHistory.txt
+add_training_column.js
+check_*.js
+reload_schema.js
+sql_*.js
+test_*.js

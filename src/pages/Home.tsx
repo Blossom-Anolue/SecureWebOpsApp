@@ -32,7 +32,9 @@ import {
   ArrowRight,
   Lock,
   Zap,
-  Eye
+  Eye,
+  FileLock2,
+  Share2
 } from 'lucide-react';
 
 // ============================================================================
@@ -47,7 +49,7 @@ const features = [
   {
     icon: Shield,
     title: 'Website Security Scans',
-    description: 'AI-powered vulnerability detection that checks your website against OWASP Top 10 threats in plain language.',
+    description: 'Automated vulnerability detection that checks your website against OWASP Top 10 threats in plain language.',
   },
   {
     icon: Mail,
@@ -176,8 +178,12 @@ export default function Home() {
               <span className="text-sm font-medium">OWASP Top 10 coverage</span>
             </div>
             <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium">AI-powered analysis</span>
+              <FileLock2 className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">PDF Encryption</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">Secure File Sharing</span>
             </div>
           </div>
         </div>

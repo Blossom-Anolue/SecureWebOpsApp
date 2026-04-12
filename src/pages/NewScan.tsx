@@ -74,6 +74,7 @@ export default function NewScan() {
         title: "Please select a domain",
         description: "Choose which website you want to scan.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
       return;
     }
@@ -93,6 +94,7 @@ export default function NewScan() {
       toast({
         title: "Scan started!",
         description: `We're scanning ${selectedDomain.domain}. This may take a few minutes.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
       navigate('/scans');
     } catch (error) {
@@ -101,6 +103,7 @@ export default function NewScan() {
         title: "Error",
         description: getReadableError(error),
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };

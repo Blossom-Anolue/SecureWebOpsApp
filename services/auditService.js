@@ -3,64 +3,37 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing Supabase admin env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_KEY.');
+let supabase;
+if (supabaseUrl && supabaseServiceKey) {
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const PRIMARY_AUDIT_TABLE = process.env.AUDIT_LOG_TABLE || 'audit_logs';
-const FALLBACK_AUDIT_TABLE = process.env.AUDIT_LOG_FALLBACK_TABLE || '';
-const SYSTEM_AUDIT_USER_ID = process.env.SYSTEM_AUDIT_USER_ID || '00000000-0000-0000-0000-000000000000';
-
-export const logEvent = async (eventData) => {
-    const { action, fileName, user, userId, organizationId, status, ip, details } = eventData;
-
-    const primaryPayload = [{
-        action_type: action,
-        file_name: fileName,
-        performed_by: user || 'SYSTEM_AUTH',
-        status: status,
-        ip_address: ip
-    }];
-
-    const primaryResult = await supabase
-        .from(PRIMARY_AUDIT_TABLE)
-        .insert(primaryPayload);
-
-    if (!primaryResult.error) return;
-
-    if (!FALLBACK_AUDIT_TABLE) {
-        console.error("FAILED TO LOG AUDIT:", {
-            primaryTable: PRIMARY_AUDIT_TABLE,
-            primaryError: primaryResult.error
-        });
+/**
+ * Centralized Audit Logging Service
+ * Records security events securely to the activity_logs table.
+ */
+export async function logEvent(logData) {
+    if (!supabase) {
+        console.warn("[Audit] Missing Supabase keys. Cannot log:", logData.action);
         return;
     }
 
-    const fallbackPayload = [{
-        user_id: userId || SYSTEM_AUDIT_USER_ID,
-        organization_id: organizationId || null,
-        action: action,
-        resource_type: 'encrypted_pdf',
-        details: {
-            file_name: fileName,
-            status: status,
-            performed_by: user || 'SYSTEM_AUTH',
-            note: details || null
-        },
-        ip_address: ip
-    }];
+    try {
+        // Use a short 5-second timeout to ensure logging never hangs the main request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const fallbackResult = await supabase
-        .from(FALLBACK_AUDIT_TABLE)
-        .insert(fallbackPayload);
+        await supabase.from('activity_logs').insert([{
+            action: logData.action,
+            resource_type: 'file',
+            resource_id: logData.fileId || null,
+            user_id: logData.user || null,
+            ip_address: logData.ip || null,
+            details: { status: logData.status, fileName: logData.fileName, message: logData.details }
+        }]).abortSignal(controller.signal);
 
-    if (fallbackResult.error) {
-        console.error("FAILED TO LOG AUDIT:", {
-            primaryTable: PRIMARY_AUDIT_TABLE,
-            primaryError: primaryResult.error,
-            fallbackTable: FALLBACK_AUDIT_TABLE,
-            fallbackError: fallbackResult.error
-        });
+        clearTimeout(timeoutId);
+    } catch (err) {
+        console.error("[Audit Service Error]:", err.message);
     }
-};
+}

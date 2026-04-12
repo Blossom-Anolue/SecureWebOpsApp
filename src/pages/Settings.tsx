@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2, AlertTriangle, Copy } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,15 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ScanScheduleCard } from '@/components/settings/ScanScheduleCard';
 import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain } from '@/hooks/useSecurityData';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: notificationSettings, isLoading: notificationsLoading } = useNotificationSettings();
   const { data: domains, isLoading: domainsLoading } = useDomains();
@@ -34,6 +38,7 @@ export default function Settings() {
   const [newDomain, setNewDomain] = useState('');
   const [newDomainScope, setNewDomainScope] = useState<string>('personal');
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Initialize form values from fetched data
   useEffect(() => {
@@ -74,12 +79,14 @@ export default function Settings() {
       toast({
         title: "Settings saved",
         description: "Your changes have been saved successfully.",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };
@@ -98,13 +105,54 @@ export default function Settings() {
       toast({
         title: "Domain added",
         description: `${newDomain} has been added to your monitored domains.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to add domain. Please try again.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeletingAccount(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      const response = await fetch('/api/user/account', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete account');
+      }
+
+      await signOut();
+      
+      toast({
+        title: "Account deleted",
+        description: "Your account has been permanently deleted.",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -113,15 +161,54 @@ export default function Settings() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0 max-w-3xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-display">Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your business information and preferences
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold font-display">Settings</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your business profile, domains, notifications, and account safety in one place.
+          </p>
+        </div>
+        <Button size="lg" onClick={handleSave} disabled={isSaving} className="lg:min-w-[180px]">
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
       </div>
 
-      {/* Business Info */}
       <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Quick Navigation</CardTitle>
+          <CardDescription>Jump to the section you need or move directly into the product areas connected to these settings.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => document.getElementById('business-information')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            Business Information
+          </Button>
+          <Button variant="outline" onClick={() => document.getElementById('domains-websites')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            Domains & Websites
+          </Button>
+          <Button variant="outline" onClick={() => document.getElementById('notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            Notifications
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+            Back To Dashboard
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/encrypt')}>
+            Open Secure Vault
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Business Info */}
+      <Card id="business-information">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Building2 className="w-5 h-5" />
@@ -158,16 +245,35 @@ export default function Settings() {
               </Select>
             </div>
           </div>
-          <div className="pt-2">
+          <div className="pt-4 space-y-2 border-t mt-4">
             <p className="text-sm text-muted-foreground">
               Signed in as: <span className="font-medium text-foreground">{user?.email}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground flex items-center">
+                Your User ID: <span className="font-mono text-xs bg-muted text-muted-foreground px-2 py-1 rounded ml-2">{user?.id}</span>
+              </p>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6" 
+                onClick={() => {
+                  navigator.clipboard.writeText(user?.id || '');
+                  toast({ title: "Copied!", description: "Your User ID has been copied to your clipboard.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+                }}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can securely share this ID with other administrators to grant them access to your encrypted files without exposing your email.
             </p>
           </div>
         </CardContent>
       </Card>
 
       {/* Domains */}
-      <Card>
+      <Card id="domains-websites">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Globe className="w-5 h-5" />
@@ -189,7 +295,7 @@ export default function Settings() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Added {new Date(domain.created_at).toLocaleDateString()}
+                    Added {new Date(domain.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <Badge variant={domain.is_verified ? 'low' : 'secondary'}>
@@ -272,7 +378,7 @@ export default function Settings() {
       )}
 
       {/* Notifications */}
-      <Card>
+      <Card id="notifications">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bell className="w-5 h-5" />
@@ -307,20 +413,60 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Save Button */}
-      <Button size="lg" className="w-full" onClick={handleSave} disabled={isSaving}>
-        {isSaving ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Saving...
-          </>
-        ) : (
-          <>
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
-          </>
-        )}
-      </Button>
+      {/* Danger Zone */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-5 h-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>Irreversible actions for your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-medium text-foreground">Delete Account</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Permanently delete your account and all associated data. This action cannot be undone.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="shrink-0">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your account
+                    and remove your data from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteAccount} 
+                    disabled={isDeletingAccount}
+                  >
+                    {isDeletingAccount ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Yes, delete my account'
+                    )}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

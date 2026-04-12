@@ -99,6 +99,56 @@ export type Database = {
           },
         ]
       }
+      encrypted_pdfs: {
+        Row: {
+          created_at: string
+          encrypted_file_name: string
+          file_size_bytes: number | null
+          id: string
+          key_label: string | null
+          mime_type: string | null
+          organization_id: string | null
+          original_file_name: string
+          storage_bucket: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_file_name: string
+          file_size_bytes?: number | null
+          id?: string
+          key_label?: string | null
+          mime_type?: string | null
+          organization_id?: string | null
+          original_file_name: string
+          storage_bucket: string
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_file_name?: string
+          file_size_bytes?: number | null
+          id?: string
+          key_label?: string | null
+          mime_type?: string | null
+          organization_id?: string | null
+          original_file_name?: string
+          storage_bucket?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encrypted_pdfs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_settings: {
         Row: {
           critical_alerts: boolean | null

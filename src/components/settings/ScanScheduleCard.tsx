@@ -172,7 +172,7 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
                 </div>
                 {schedule.next_run_at && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Next: {format(new Date(schedule.next_run_at), 'MMM d, yyyy')}
+                    Next: {format(new Date(schedule.next_run_at), 'MMM d, yyyy · h:mm a')}
                   </p>
                 )}
               </div>

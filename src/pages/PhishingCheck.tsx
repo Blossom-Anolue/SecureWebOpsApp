@@ -68,12 +68,14 @@ export default function PhishingCheck() {
         description: selectedScope === 'personal'
           ? 'Your result was saved to your personal phishing history.'
           : `Your result was saved under ${selectedOrganization?.name ?? 'your company workspace'}.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       toast({
         title: 'Analysis failed',
         description: error instanceof Error ? error.message : 'Unable to analyze the content right now.',
         variant: 'destructive',
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
   };

@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Shield, 
@@ -11,7 +12,8 @@ import {
   HelpCircle,
   LogOut,
   Search,
-  Lock
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { KeyboardShortcutsDialog } from '@/components/shortcuts/KeyboardShortcutsDialog';
 import { cn } from '@/lib/utils';
@@ -31,7 +33,7 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/scans', icon: Shield, label: 'Website Scans' },
   { to: '/phishing', icon: Mail, label: 'Phishing Check' },
-  { to: '/encrypt', icon: Lock, label: 'PDF Secure Vault' }, 
+  { to: '/encrypt', icon: Lock, label: 'Secure Vault' },
   { to: '/training', icon: GraduationCap, label: 'Training' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/activity', icon: Activity, label: 'Activity Log' },
@@ -39,14 +41,25 @@ const navItems = [
 ];
 
 export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
+  const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { data: organizations } = useOrganizations();
   const { data: pendingInvites } = usePendingInvites();
   const primaryOrg = organizations?.[0];
   const pendingInviteCount = pendingInvites?.length ?? 0;
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      onClose?.();
+      navigate('/auth', { replace: true });
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -140,10 +153,11 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
         <Button 
           variant="ghost" 
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/50"
+          disabled={isSigningOut}
           onClick={handleSignOut}
         >
           <LogOut className="w-4 h-4 mr-2" />
-          Sign Out
+          {isSigningOut ? 'Signing Out...' : 'Sign Out'}
         </Button>
       </div>
 

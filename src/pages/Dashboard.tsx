@@ -20,8 +20,14 @@
  * @module pages/Dashboard
  */
 
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Puzzle, Download, ExternalLink } from 'lucide-react';
+import { Shield, Mail, Puzzle, Download, ExternalLink, Lock, FileUp, Settings as SettingsIcon, Globe } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import { SecurityScore } from '@/components/dashboard/SecurityScore';
 import { StatusCard } from '@/components/dashboard/StatusCard';
 import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
@@ -32,6 +38,7 @@ import { LoadingState } from '@/components/common/LoadingState';
 import { useScans, usePhishingChecks, useSecurityScores, useDomains, useProfile } from '@/hooks/useSecurityData';
 import { mockRecommendations } from '@/lib/mock-data';
 import type { SecurityScore as SecurityScoreType } from '@/types';
+import Greeting from '@/components/Greeting';
 
 /**
  * Dashboard page component.
@@ -43,6 +50,7 @@ import type { SecurityScore as SecurityScoreType } from '@/types';
  */
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const extensionDownloadUrl = '/downloads/securewebops-extension.zip';
   
   // Fetch all required data in parallel
@@ -51,6 +59,71 @@ export default function Dashboard() {
   const { data: securityScores, isLoading: scoresLoading } = useSecurityScores();
   const { data: domains, isLoading: domainsLoading } = useDomains();
   const { data: profile } = useProfile();
+
+  // Vault stats
+  const [vaultFileCount, setVaultFileCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchVaultData = async () => {
+      const [ownedResult, sharedResult] = await Promise.all([
+        supabase
+          .from('encrypted_pdfs' as any)
+          .select('id')
+          .eq('user_id', user.id),
+        supabase
+          .from('file_permissions' as any)
+          .select('file_id')
+          .eq('user_id', user.id),
+      ]);
+
+      if (ownedResult.error) {
+        console.error('Failed to load owned vault files:', ownedResult.error);
+      }
+
+      if (sharedResult.error) {
+        console.error('Failed to load shared vault files:', sharedResult.error);
+      }
+
+      const fileIds = new Set<string>();
+
+      for (const file of ownedResult.data || []) {
+        if (file?.id) fileIds.add(file.id);
+      }
+
+      for (const permission of sharedResult.data || []) {
+        if (permission?.file_id) fileIds.add(permission.file_id);
+      }
+
+      setVaultFileCount(fileIds.size);
+    };
+
+    void fetchVaultData();
+
+    // Subscribe to real-time changes
+    const subscription = supabase
+      .channel('vault_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'encrypted_pdfs', filter: `user_id=eq.${user.id}` },
+        () => {
+          void fetchVaultData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'file_permissions', filter: `user_id=eq.${user.id}` },
+        () => {
+          void fetchVaultData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user?.id]);
 
   // Combine loading states
   const isLoading = scansLoading || phishingLoading || scoresLoading || domainsLoading;
@@ -67,9 +140,8 @@ export default function Dashboard() {
   if (!domains || domains.length === 0) {
     return (
       <div className="space-y-6 pb-20 lg:pb-0">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Security Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Your business security at a glance</p>
+        <div className="space-y-1">
+          <Greeting />
         </div>
         
         <EmptyState
@@ -122,9 +194,55 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-display">Security Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Your business security at a glance</p>
+      <div className="space-y-1">
+        <Greeting />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="shadow-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">What To Do Next</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Move through setup in the same order you will use the product: confirm your business profile, monitor your domains, then protect files in the vault.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => navigate('/settings')}>
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                Review Settings
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/scans/new')}>
+                <Globe className="w-4 h-4 mr-2" />
+                Run Website Scan
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/encrypt')}>
+                <FileUp className="w-4 h-4 mr-2" />
+                Encrypt A File
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Quick Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="grid sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Domains</p>
+              <p className="mt-1 text-2xl font-semibold">{domains.length}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed Scans</p>
+              <p className="mt-1 text-2xl font-semibold">{completedScans.length}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vault Files</p>
+              <p className="mt-1 text-2xl font-semibold">{vaultFileCount}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="rounded-xl border bg-card shadow-card p-5">
@@ -189,7 +307,7 @@ export default function Dashboard() {
       {/* ================================================================== */}
       {/* STATUS CARDS - Quick access to key areas */}
       {/* ================================================================== */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-4">
         {/* Website Security Card */}
         <StatusCard
           icon={Shield}
@@ -217,6 +335,16 @@ export default function Dashboard() {
           summaryColor={recentHighRiskPhishing > 0 ? 'warning' : 'success'}
           primaryAction={{ label: 'Check Email', onClick: () => navigate('/phishing/check') }}
           secondaryAction={{ label: 'View History', onClick: () => navigate('/phishing/history') }}
+        />
+
+        {/* Secure Vault Card */}
+        <StatusCard
+          icon={Lock}
+          title="Secure File Vault"
+          summary={`${vaultFileCount} protected file${vaultFileCount !== 1 ? 's' : ''}`}
+          summaryColor={vaultFileCount > 0 ? 'success' : 'warning'}
+          primaryAction={{ label: 'Encrypt New', onClick: () => navigate('/encrypt') }}
+          secondaryAction={{ label: 'My Vault', onClick: () => navigate('/vault') }}
         />
       </div>
 

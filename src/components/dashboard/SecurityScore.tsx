@@ -92,11 +92,11 @@ export function SecurityScore({ data }: SecurityScoreProps) {
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <Calendar className="w-3 h-3" />
-              <span>Last scan: {format(new Date(data.lastScanDate), 'MMM d, yyyy')}</span>
-            </div>
-            <div className="flex items-center gap-1">
+              <span>Last scan: {format(new Date(data.lastScanDate), 'MMM d, yyyy · h:mm a')}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
               <Calendar className="w-3 h-3" />
-              <span>Next scan: {format(new Date(data.nextScanDate), 'MMM d, yyyy')}</span>
+              <span>Next scan: {format(new Date(data.nextScanDate), 'MMM d, yyyy · h:mm a')}</span>
             </div>
           </div>
         </div>

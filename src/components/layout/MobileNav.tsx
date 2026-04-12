@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Shield, Mail, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, Shield, Mail, Users, Settings, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { usePendingInvites } from '@/hooks/useOrganizations';
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
   { to: '/scans', icon: Shield, label: 'Scans' },
   { to: '/phishing', icon: Mail, label: 'Phishing' },
+  { to: '/encrypt', icon: Lock, label: 'Vault' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];

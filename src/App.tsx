@@ -20,7 +20,8 @@ import Settings from "@/pages/Settings";
 import Team from "@/pages/Team";
 import ActivityLog from "@/pages/ActivityLog";
 import NotFound from "@/pages/NotFound";
-import PDFEncryption from './pages/PDFEncryption';
+import SecureVault from './pages/SecureVault';
+import ResetPassword from './pages/ResetPassword';
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
@@ -52,7 +54,8 @@ const App = () => (
                   <Route path="/team" element={<Team />} />
                   <Route path="/activity" element={<ActivityLog />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/encrypt" element={<PDFEncryption />} />
+                  <Route path="/encrypt" element={<SecureVault />} />
+                  <Route path="/vault" element={<SecureVault />} />
                 </Route>
               </Route>
               

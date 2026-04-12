@@ -58,6 +58,7 @@ export default function ScanDetail() {
       toast({
         title: "Report ready",
         description: "Use your browser's print dialog to save as PDF.",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -65,6 +66,7 @@ export default function ScanDetail() {
         title: "Failed to generate report",
         description: "Please try again later.",
         variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } finally {
       setIsDownloading(false);
@@ -102,6 +104,7 @@ export default function ScanDetail() {
     toast({
       title: "Copied!",
       description: "Recommendation copied to clipboard.",
+      className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
     });
   };
 
