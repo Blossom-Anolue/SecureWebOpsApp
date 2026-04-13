@@ -822,7 +822,16 @@ router.post('/share/:fileId', checkPermission('ADMIN'), async (req, res) => {
         }
 
         if (recipient.userId === adminId) {
-            return res.status(400).json({ error: "You already have owner access to this file." });
+            await logEvent({
+                action: 'ACCESS_GRANTED',
+                user: adminId,
+                status: 'SUCCESS',
+                fileId,
+                ip: req.ip,
+                details: `Owner access confirmed for ${adminId}; no share record required.`
+            });
+
+            return res.json({ message: "You already have owner access to this file." });
         }
 
         const sharePayload = {

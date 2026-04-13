@@ -19,6 +19,35 @@ import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
+async function copyTextToClipboard(value: string) {
+  if (!value) {
+    throw new Error('Nothing to copy.');
+  }
+
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = value;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const copied = document.execCommand('copy');
+    if (!copied) {
+      throw new Error('Copy command was rejected.');
+    }
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -257,9 +286,13 @@ export default function Settings() {
                 variant="ghost" 
                 size="icon" 
                 className="h-6 w-6" 
-                onClick={() => {
-                  navigator.clipboard.writeText(user?.id || '');
-                  toast({ title: "Copied!", description: "Your User ID has been copied to your clipboard.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+                onClick={async () => {
+                  try {
+                    await copyTextToClipboard(user?.id || '');
+                    toast({ title: "Copied!", description: "Your User ID has been copied to your clipboard.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+                  } catch {
+                    toast({ title: "Copy failed", description: "We could not copy your User ID automatically. Please copy it manually.", variant: 'destructive', className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+                  }
                 }}
               >
                 <Copy className="h-3 w-3" />

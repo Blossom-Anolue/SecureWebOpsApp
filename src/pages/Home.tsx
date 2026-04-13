@@ -321,9 +321,14 @@ export default function Home() {
               <span className="font-semibold">SecureWebOps</span>
             </div>
             {/* Copyright */}
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} SecureWebOps. Simple security for small businesses.
-            </p>
+            <div className="text-center md:text-right">
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Co-founded by Blossom Anolue, Delphe Melinda Ngako, Drishti Tejwani, and Gavin Moore.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                © {new Date().getFullYear()} SecureWebOps. Simple security for small businesses.
+              </p>
+            </div>
           </div>
         </div>
       </footer>
