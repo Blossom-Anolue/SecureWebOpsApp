@@ -1,6 +1,7 @@
-const APP_BASE_URL = "http://localhost:8080/dashboard";
+const APP_BASE_URL = "http://172.20.0.220:3000/dashboard";
 const APP_TAB_PATTERNS = [
   "http://localhost:8080/*",
+  "http://172.20.0.220:3000/*",
   "https://securewebops.gannon.link/*",
 ];
 const SITE_STORAGE_KEY = "sb-culznwivxwtvrmohstht-auth-token";

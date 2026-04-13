@@ -23,10 +23,10 @@
     "https://outlook.live.com/*",
     "http://localhost:8080/*",
     "http://localhost:3000/*",
+    "http://172.20.0.220:3000/*",
     "https://securewebops.gannon.link/*",
     "https://api.securewebops.gannon.link/*",
-    "https://culznwivxwtvrmohstht.supabase.co/*",
-    "http://172.20.0.220:3000/*"
+    "https://culznwivxwtvrmohstht.supabase.co/*"
   ],
   "content_scripts": [
     {
