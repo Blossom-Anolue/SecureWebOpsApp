@@ -33,7 +33,7 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/scans', icon: Shield, label: 'Website Scans' },
   { to: '/phishing', icon: Mail, label: 'Phishing Check' },
-  { to: '/encrypt', icon: Lock, label: 'Secure Vault' },
+  { to: '/encrypt', icon: Lock, label: 'Protected Files' },
   { to: '/training', icon: GraduationCap, label: 'Training' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/activity', icon: Activity, label: 'Activity Log' },
@@ -54,9 +54,10 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
 
     setIsSigningOut(true);
     try {
-      await signOut();
       onClose?.();
+      const signOutPromise = signOut();
       navigate('/auth', { replace: true });
+      await signOutPromise;
     } finally {
       setIsSigningOut(false);
     }
@@ -70,9 +71,13 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
           <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
             <Shield className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
-          <div>
-            <h1 className="font-display font-bold text-lg text-sidebar-primary-foreground">SecureWebOps</h1>
-            <p className="text-xs text-sidebar-foreground/60">Security Assistant</p>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-white leading-none drop-shadow-sm">
+              SecureWebOps
+            </h1>
+            <p className="mt-1 text-sm font-medium tracking-wide text-sidebar-foreground/75">
+              Security Assistant
+            </p>
           </div>
         </div>
         {onClose && (

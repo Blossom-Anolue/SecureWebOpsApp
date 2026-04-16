@@ -205,7 +205,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Move through setup in the same order you will use the product: confirm your business profile, monitor your domains, then protect files in the vault.
+              Move through setup in the same order you will use the product: confirm your business profile, monitor your domains, then protect important files.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/settings')}>
@@ -337,14 +337,14 @@ export default function Dashboard() {
           secondaryAction={{ label: 'View History', onClick: () => navigate('/phishing/history') }}
         />
 
-        {/* Secure Vault Card */}
+        {/* Protected Files Card */}
         <StatusCard
           icon={Lock}
           title="Secure File Vault"
           summary={`${vaultFileCount} protected file${vaultFileCount !== 1 ? 's' : ''}`}
           summaryColor={vaultFileCount > 0 ? 'success' : 'warning'}
           primaryAction={{ label: 'Encrypt New', onClick: () => navigate('/encrypt') }}
-          secondaryAction={{ label: 'My Vault', onClick: () => navigate('/vault') }}
+          secondaryAction={{ label: 'My Files', onClick: () => navigate('/vault') }}
         />
       </div>
 

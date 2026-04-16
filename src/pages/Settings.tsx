@@ -48,6 +48,25 @@ async function copyTextToClipboard(value: string) {
   }
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+
+  if (error && typeof error === 'object') {
+    const maybeMessage = 'message' in error ? error.message : null;
+    const maybeDetails = 'details' in error ? error.details : null;
+    const maybeHint = 'hint' in error ? error.hint : null;
+
+    const parts = [maybeMessage, maybeDetails, maybeHint]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+  }
+
+  return fallback;
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -86,38 +105,92 @@ export default function Settings() {
   }, [notificationSettings]);
 
   const isLoading = profileLoading || notificationsLoading || domainsLoading;
+  const normalizedCompanyName = companyName.trim();
+  const normalizedIndustry = industry.trim();
+  const savedCompanyName = profile?.company_name ?? '';
+  const savedIndustry = profile?.industry ?? '';
+  const savedNotifyEmail = notificationSettings?.email_notifications ?? true;
+  const savedNotifyCritical = notificationSettings?.critical_alerts ?? true;
+  const savedNotifyWeekly = notificationSettings?.weekly_summary ?? true;
+
+  const profileHasChanges = normalizedCompanyName !== savedCompanyName || normalizedIndustry !== savedIndustry;
+  const notificationsHaveChanges =
+    notifyEmail !== savedNotifyEmail ||
+    notifyCritical !== savedNotifyCritical ||
+    notifyWeekly !== savedNotifyWeekly;
+  const hasChanges = profileHasChanges || notificationsHaveChanges;
+  const isSaving = updateProfile.isPending || updateNotifications.isPending;
+  const saveButtonLabel = isSaving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Saved';
 
   if (isLoading) {
     return <LoadingState message="Loading settings..." />;
   }
 
   const handleSave = async () => {
-    try {
-      await Promise.all([
-        updateProfile.mutateAsync({
-          company_name: companyName,
-          industry,
-        }),
-        updateNotifications.mutateAsync({
+    if (!hasChanges) {
+      toast({
+        title: "No changes to save",
+        description: "Your settings are already up to date.",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
+    const failedSections: string[] = [];
+    const errorMessages: string[] = [];
+
+    if (profileHasChanges) {
+      try {
+        await updateProfile.mutateAsync({
+          company_name: normalizedCompanyName,
+          industry: normalizedIndustry,
+        });
+      } catch (error) {
+        failedSections.push('profile');
+        errorMessages.push(getErrorMessage(error, 'Profile save failed.'));
+      }
+    }
+
+    if (notificationsHaveChanges) {
+      try {
+        await updateNotifications.mutateAsync({
           email_notifications: notifyEmail,
           critical_alerts: notifyCritical,
           weekly_summary: notifyWeekly,
-        }),
-      ]);
-      
+        });
+      } catch (error) {
+        failedSections.push('notifications');
+        errorMessages.push(getErrorMessage(error, 'Notification settings save failed.'));
+      }
+    }
+
+    if (failedSections.length === 0) {
       toast({
         title: "Settings saved",
         description: "Your changes have been saved successfully.",
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
-    } catch (error) {
+      return;
+    }
+
+    const errorDescription = errorMessages[0] || 'Failed to save settings. Please try again.';
+
+    if (failedSections.length < (profileHasChanges ? 1 : 0) + (notificationsHaveChanges ? 1 : 0)) {
       toast({
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
+        title: "Saved with issues",
+        description: errorDescription,
         variant: "destructive",
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
+      return;
     }
+
+    toast({
+        title: "Error",
+        description: errorDescription,
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
   };
 
   const handleAddDomain = async () => {
@@ -185,8 +258,6 @@ export default function Settings() {
     }
   };
 
-  const isSaving = updateProfile.isPending || updateNotifications.isPending;
-
   return (
     <div className="space-y-6 pb-20 lg:pb-0 max-w-3xl">
       {/* Header */}
@@ -197,16 +268,16 @@ export default function Settings() {
             Manage your business profile, domains, notifications, and account safety in one place.
           </p>
         </div>
-        <Button size="lg" onClick={handleSave} disabled={isSaving} className="lg:min-w-[180px]">
+        <Button size="lg" onClick={handleSave} disabled={isSaving || !hasChanges} className="lg:min-w-[180px]">
           {isSaving ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
+              {saveButtonLabel}
             </>
           ) : (
             <>
               <Save className="w-4 h-4 mr-2" />
-              Save Changes
+              {saveButtonLabel}
             </>
           )}
         </Button>
@@ -231,7 +302,7 @@ export default function Settings() {
             Back To Dashboard
           </Button>
           <Button variant="outline" onClick={() => navigate('/encrypt')}>
-            Open Secure Vault
+            Open Protected Files
           </Button>
         </CardContent>
       </Card>

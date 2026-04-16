@@ -81,6 +81,13 @@ const benefits = [
   'Track your security over time',
 ];
 
+const founders = [
+  'Blossom Anolue',
+  'Delphe Melinda Ngako',
+  'Drishti Tejwani',
+  'Gavin Moore',
+];
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -321,10 +328,22 @@ export default function Home() {
               <span className="font-semibold">SecureWebOps</span>
             </div>
             {/* Copyright */}
-            <div className="text-center md:text-right">
-              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                Co-founded by Blossom Anolue, Delphe Melinda Ngako, Drishti Tejwani, and Gavin Moore.
-              </p>
+            <div className="text-center md:text-right space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
+                  Co-Founders
+                </p>
+                <div className="mt-2 flex flex-wrap justify-center gap-2 md:justify-end">
+                  {founders.map((founder) => (
+                    <span
+                      key={founder}
+                      className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                    >
+                      {founder}
+                    </span>
+                  ))}
+                </div>
+              </div>
               <p className="text-sm text-muted-foreground">
                 © {new Date().getFullYear()} SecureWebOps. Simple security for small businesses.
               </p>
