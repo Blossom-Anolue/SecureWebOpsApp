@@ -14,9 +14,13 @@
  * @module contexts/AuthContext
  */
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+
+const AUTH_REDIRECT_BASE =
+  import.meta.env.VITE_AUTH_REDIRECT_URL?.trim().replace(/\/+$/, '') || window.location.origin;
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -80,6 +84,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * }
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   /** Current authenticated user */
   const [user, setUser] = useState<User | null>(null);
   /** Current session with auth tokens */
@@ -88,6 +93,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any | null>(null);
   /** Loading state - true until initial auth check completes */
   const [loading, setLoading] = useState(true);
+  const lastProfileUserIdRef = useRef<string | null>(null);
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    setProfile(data);
+  }, []);
+
+  const syncAuthState = useCallback(async (authSession: Session | null) => {
+    const nextUser = authSession?.user ?? null;
+
+    setSession(authSession);
+    setUser(nextUser);
+
+    if (!nextUser) {
+      lastProfileUserIdRef.current = null;
+      setProfile(null);
+      return;
+    }
+
+    if (lastProfileUserIdRef.current === nextUser.id) return;
+
+    lastProfileUserIdRef.current = nextUser.id;
+    await fetchProfile(nextUser.id);
+  }, [fetchProfile]);
 
   /**
    * Set up authentication state management on mount.
@@ -107,9 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : (supabase.auth as any).session();
 
         if (mounted) {
-          setSession(authSession ?? null);
-          setUser(authSession?.user ?? null);
-          if (authSession?.user) await fetchProfile(authSession.user.id);
+          await syncAuthState(authSession ?? null);
         }
       } catch (err) {
         console.error("Auth initialization error:", err);
@@ -124,13 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange(async (_event, authSession) => {
       if (!mounted) return;
       try {
-        setSession(authSession ?? null);
-        setUser(authSession?.user ?? null);
-        if (authSession?.user) {
-          await fetchProfile(authSession.user.id);
-        } else {
-          setProfile(null);
-        }
+        await syncAuthState(authSession ?? null);
       } catch (err) {
         console.error("Auth state change error:", err);
       } finally {
@@ -147,34 +173,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (data as any).unsubscribe();
       }
     };
-  }, []);
+  }, [syncAuthState]);
 
-  // Force logout on page close/unload to prevent session restoration
-  useEffect(() => {
-    const handleUnload = () => {
-      // Sign out synchronously when the page unloads
-      supabase.auth.signOut();
-    };
-    
-    window.addEventListener('unload', handleUnload);
-    return () => {
-      window.removeEventListener('unload', handleUnload);
-    };
-  }, []);
+  const signIn = useCallback(
+    (email: string, password: string) => supabase.auth.signInWithPassword({ email, password }),
+    []
+  );
 
-  async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    setProfile(data);
-  }
-
-  const signIn = (email: string, password: string) => 
-    supabase.auth.signInWithPassword({ email, password });
-
-  const signUp = (email: string, password: string, metadata?: any) => 
+  const signUp = useCallback((email: string, password: string, metadata?: any) =>
     supabase.auth.signUp({
       email,
       password,
@@ -185,45 +191,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           company_name: metadata?.companyName,
           job_role: metadata?.jobRole,
         },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${AUTH_REDIRECT_BASE}/dashboard`,
       }
-    });
+    }), []);
 
-  const signInWithMagicLink = (email: string) => 
+  const signInWithMagicLink = useCallback((email: string) =>
     supabase.auth.signInWithOtp({ 
-      email,
+      email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${AUTH_REDIRECT_BASE}/dashboard`,
+        shouldCreateUser: false,
       }
-    });
+    }), []);
 
-  const verifyOTP = (email: string, token: string) =>
+  const verifyOTP = useCallback((email: string, token: string) =>
     supabase.auth.verifyOtp({
-      email,
-      token,
+      email: email.trim(),
+      token: token.trim(),
       type: 'email',
-    });
+    }), []);
 
-  const resetPassword = (email: string) => 
+  const resetPassword = useCallback((email: string) =>
     supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+      redirectTo: `${AUTH_REDIRECT_BASE}/reset-password`,
+    }), []);
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error("Sign out error:", error.message);
-    
-    // Force clear local state in case the auth listener misses it (e.g., if session was already expired)
+  const signOut = useCallback(async () => {
+    lastProfileUserIdRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);
+    queryClient.clear();
+
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("Sign out error:", error.message);
+
     return { error };
-  };
+  }, [queryClient]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      profile,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      signInWithMagicLink,
+      resetPassword,
+      verifyOTP,
+    }),
+    [user, session, profile, loading, signIn, signUp, signOut, signInWithMagicLink, resetPassword, verifyOTP]
+  );
 
   return (
-    <AuthContext.Provider 
-      value={{ user, session, profile, loading, signIn, signUp, signOut, signInWithMagicLink, resetPassword, verifyOTP }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -243,6 +243,22 @@ export interface Profile {
   updated_at: string;
 }
 
+function normalizeProfileRow(row: Record<string, unknown> | null): Profile | null {
+  if (!row) return null;
+
+  const companyName =
+    typeof row.company_name === 'string'
+      ? row.company_name
+      : typeof row.business_name === 'string'
+        ? row.business_name
+        : null;
+
+  return {
+    ...row,
+    company_name: companyName,
+  } as Profile;
+}
+
 /**
  * Represents user notification preferences.
  * Controls how and when the user receives alerts.
@@ -637,7 +653,7 @@ export function useProfile() {
         .maybeSingle();
       
       if (error) throw error;
-      return data as Profile | null;
+      return normalizeProfileRow(data as Record<string, unknown> | null);
     },
     enabled: !!user,
   });
@@ -655,18 +671,73 @@ export function useUpdateProfile() {
   
   return useMutation({
     mutationFn: async (updates: Partial<Profile>) => {
-      const { data, error } = await supabase
+      const profilePayload = {
+        ...updates,
+      };
+
+      let { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(profilePayload)
         .eq('id', user!.id)
         .select()
-        .single();
-      
+        .maybeSingle();
+
+      const profileErrorMessage = toErrorMessage(error, '');
+      if (error && profileErrorMessage.includes('company_name')) {
+        const { company_name, ...restPayload } = profilePayload as Record<string, unknown>;
+        const legacyUpdatePayload = {
+          ...restPayload,
+          ...(typeof company_name === 'string' ? { business_name: company_name } : {}),
+        };
+
+        const legacyUpdateResult = await supabase
+          .from('profiles')
+          .update(legacyUpdatePayload)
+          .eq('id', user!.id)
+          .select('*')
+          .maybeSingle();
+
+        data = legacyUpdateResult.data;
+        error = legacyUpdateResult.error;
+      }
+
+      if (!error && data) {
+        return normalizeProfileRow(data as Record<string, unknown> | null) as Profile;
+      }
+
       if (error) throw error;
-      return data as Profile;
+
+      let insertPayload: Record<string, unknown> = {
+        id: user!.id,
+        ...profilePayload,
+      };
+
+      let insertResult = await supabase
+        .from('profiles')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      const insertErrorMessage = toErrorMessage(insertResult.error, '');
+      if (insertResult.error && insertErrorMessage.includes('company_name')) {
+        const { company_name, ...restPayload } = insertPayload;
+        insertPayload = {
+          ...restPayload,
+          ...(typeof company_name === 'string' ? { business_name: company_name } : {}),
+        };
+
+        insertResult = await supabase
+          .from('profiles')
+          .insert(insertPayload)
+          .select('*')
+          .single();
+      }
+      
+      if (insertResult.error) throw insertResult.error;
+      return normalizeProfileRow(insertResult.data as Record<string, unknown> | null) as Profile;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    onSuccess: (data) => {
+      queryClient.setQueryData(['profile', user?.id], data);
     },
   });
 }
@@ -716,13 +787,25 @@ export function useUpdateNotificationSettings() {
         .update(updates)
         .eq('user_id', user!.id)
         .select()
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
-      return data as NotificationSettings;
+      if (data) return data as NotificationSettings;
+
+      const insertResult = await supabase
+        .from('notification_settings')
+        .insert({
+          user_id: user!.id,
+          ...updates,
+        })
+        .select()
+        .single();
+
+      if (insertResult.error) throw insertResult.error;
+      return insertResult.data as NotificationSettings;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification_settings'] });
+    onSuccess: (data) => {
+      queryClient.setQueryData(['notification_settings', user?.id], data);
     },
   });
 }

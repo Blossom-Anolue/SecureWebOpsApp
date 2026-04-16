@@ -68,7 +68,7 @@ const signUpSchema = authSchema.extend({
  */
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading, signIn, signUp, signInWithMagicLink, resetPassword, verifyOTP } = useAuth();
+  const { user, loading, signIn, signUp, signInWithMagicLink, resetPassword } = useAuth();
   
   // Form state
   const [activeTab, setActiveTab] = useState('signin');
@@ -84,9 +84,8 @@ export default function Auth() {
 
   const [accountType, setAccountType] = useState<'personal' | 'company' | null>(null);
   const [showVerification, setShowVerification] = useState(false);
+  const [showMagicLinkSent, setShowMagicLinkSent] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [showOTPInput, setShowOTPInput] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
   const [timer, setTimer] = useState(0);
 
   const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
@@ -188,25 +187,21 @@ export default function Auth() {
 
   const handleRequestOTP = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!email) return toast({ title: "Email Required", description: "Please enter your email first.", variant: "destructive" });
-    setIsSubmitting(true);
-    const { error } = await signInWithMagicLink(email);
-    setIsSubmitting(false);
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' }); 
-    else {
-      setShowOTPInput(true);
-      setTimer(60);
-      toast({ title: "Code Sent", description: "Check your email for the 6-digit code.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' }); 
-    }
-  };
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return toast({ title: "Email Required", description: "Please enter your email first.", variant: "destructive" });
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
     setIsSubmitting(true);
-    const { error } = await verifyOTP(email, otpCode);
+    const { error } = await signInWithMagicLink(normalizedEmail);
     setIsSubmitting(false);
-    if (error) toast({ title: "Invalid Code", description: error.message, variant: "destructive" });
-    else navigate('/dashboard');
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+    } 
+    else {
+      setEmail(normalizedEmail);
+      setShowMagicLinkSent(true);
+      setTimer(60);
+      toast({ title: "Link Sent", description: "Check your email and click the secure sign-in link.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' }); 
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -298,6 +293,7 @@ export default function Auth() {
       }
     } else {
       setShowVerification(true);
+      setShowMagicLinkSent(false);
       // Send welcome email asynchronously
       supabase.functions.invoke('send-welcome-email', {
         body: { email, name: fullName }
@@ -337,10 +333,10 @@ export default function Auth() {
         <Card>
           <CardHeader className="text-center pb-2">
             <CardTitle className="flex items-center justify-center gap-2">
-            {showVerification ? 'Check Email' : isResetting ? 'Reset Password' : showOTPInput ? 'Enter OTP' : activeTab === 'signin' ? 'Welcome back' : 'Welcome'}
+            {showVerification || showMagicLinkSent ? 'Check Email' : isResetting ? 'Reset Password' : activeTab === 'signin' ? 'Welcome back' : 'Welcome'}
             </CardTitle>
             <CardDescription>
-              {showVerification || isResetting || showOTPInput ? '' : 'Sign in to your account or create a new one'}
+              {showVerification || showMagicLinkSent || isResetting ? '' : 'Sign in to your account or create a new one'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -350,6 +346,33 @@ export default function Auth() {
                 <p className="text-sm">We've sent a verification link to <strong>{email}</strong>.</p>
                 <Button variant="outline" className="w-full" onClick={() => { setShowVerification(false); setActiveTab('signin'); }}>Back to Login</Button>
               </div>
+            ) : showMagicLinkSent ? (
+              <div className="text-center space-y-4 py-4">
+                <MailCheck className="mx-auto w-12 h-12 text-primary" />
+                <p className="text-sm">
+                  We&apos;ve sent a secure sign-in link to <strong>{email}</strong>.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Open the link in your email to finish signing in on this device.
+                </p>
+                <div className="h-6">
+                  {timer > 0 ? (
+                    <span className="text-[10px] text-muted-foreground italic">Resend available in {timer}s</span>
+                  ) : (
+                    <button type="button" onClick={handleRequestOTP} className="text-[10px] text-primary font-bold hover:underline">Resend Link</button>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowMagicLinkSent(false);
+                    setTimer(0);
+                  }}
+                >
+                  Back to Login
+                </Button>
+              </div>
             ) : isResetting ? (
               <form onSubmit={handleForgotPassword} className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -358,22 +381,6 @@ export default function Auth() {
                 </div>
                 <Button className="w-full" disabled={isSubmitting}>Send Reset Link</Button>
                 <Button type="button" variant="ghost" className="w-full" onClick={() => setIsResetting(false)}>Cancel</Button>
-              </form>
-            ) : showOTPInput ? (
-              <form onSubmit={handleVerifyOTP} className="space-y-4 py-4 text-center">
-                <div className="space-y-2">
-                  <Label>6-digit Code</Label>
-                  <Input placeholder="123456" value={otpCode} onChange={e => setOtpCode(e.target.value)} className="text-center text-lg tracking-widest font-mono" maxLength={6} required />
-                </div>
-                <div className="h-6">
-                  {timer > 0 ? (
-                    <span className="text-[10px] text-muted-foreground italic">Resend available in {timer}s</span>
-                  ) : (
-                    <button type="button" onClick={handleRequestOTP} className="text-[10px] text-primary font-bold hover:underline">Resend Code</button>
-                  )}
-                </div>
-                <Button className="w-full" disabled={isSubmitting}>Verify & Sign In</Button>
-                <Button type="button" variant="ghost" className="w-full" onClick={() => setShowOTPInput(false)}>Back to Password</Button>
               </form>
             ) : (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -436,7 +443,7 @@ export default function Auth() {
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <button type="button" onClick={handleRequestOTP} className="text-xs text-primary hover:underline">Use OTP Instead</button>
+                    <button type="button" onClick={handleRequestOTP} className="text-xs text-primary hover:underline">Email Me a Sign-In Link</button>
                     <button type="button" onClick={() => setIsResetting(true)} className="text-xs text-primary hover:underline">Forgot password?</button>
                   </div>
 

@@ -33,9 +33,9 @@ export default function SecureVault() {
           <Database className="text-primary w-8 h-8" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">Secure Data Vault</h1>
+          <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">Protected Files</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Encrypt sensitive files with AES-256-GCM and manage your secure documents.
+            Protect important files, control access, and manage shared documents in one place.
           </p>
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function SecureVault() {
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary font-medium transition-all"
           >
             <Lock className="w-4 h-4 mr-2" />
-            My Vault & Sharing
+            My Files & Sharing
           </TabsTrigger>
         </TabsList>
 
