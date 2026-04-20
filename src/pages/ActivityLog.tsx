@@ -20,7 +20,8 @@ import {
   Trash2,
   ShieldAlert,
   FileUp,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -83,12 +84,21 @@ const ACTION_CONFIG: Record<string, { icon: typeof Activity; label: string; colo
   'UPLOAD_ATTEMPT': { icon: FileUp, label: 'Vault Upload Attempt', color: 'text-muted-foreground', iconBg: 'bg-muted', border: 'border-muted' },
 };
 
+// Safe date formatter to prevent React crashing on invalid timestamps
+function safeFormat(dateStr: any, formatStr: string, fallback = 'Unknown Date'): string {
+  if (!dateStr) return fallback;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return fallback;
+  return format(d, formatStr);
+}
+
 export default function ActivityLogPage() {
   const { data: organizations } = useOrganizations();
   const { user } = useAuth();
   const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
   const [filterAction, setFilterAction] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [hiddenLogIds, setHiddenLogIds] = useState<Set<string>>(new Set());
   const [decryptLog, setDecryptLog] = useState<{id: string, fileId: string, fileName: string} | null>(null);
   const [decryptEmail, setDecryptEmail] = useState('');
@@ -132,9 +142,22 @@ export default function ActivityLogPage() {
     }
   };
 
-  const filteredLogs = logs?.filter(log => 
-    (filterAction === 'all' || log.action === filterAction) && !hiddenLogIds.has(log.id)
-  );
+  const filteredLogs = logs?.filter(log => {
+    if (filterAction !== 'all' && log.action !== filterAction) return false;
+    if (hiddenLogIds.has(log.id)) return false;
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const actionStr = String(log.action || '');
+      const label = (ACTION_CONFIG[actionStr]?.label || actionStr).toLowerCase();
+      const resource = String(log.resource_type || '').toLowerCase();
+      const details = formatDetails(log.details).toLowerCase();
+      
+      if (!label.includes(query) && !resource.includes(query) && !details.includes(query)) return false;
+    }
+    
+    return true;
+  });
 
   const handleClearAll = async () => {
     if (!filteredLogs?.length) return;
@@ -172,13 +195,16 @@ export default function ActivityLogPage() {
     if (!filteredLogs?.length) return;
 
     const headers = ['Date', 'Time', 'Action', 'Resource Type', 'Details'];
-    const rows = filteredLogs.map(log => [
-      format(new Date(log.created_at), 'yyyy-MM-dd'),
-      format(new Date(log.created_at), 'HH:mm:ss'),
-      ACTION_CONFIG[log.action]?.label || log.action,
-      log.resource_type,
-      JSON.stringify(log.details),
-    ]);
+    const rows = filteredLogs.map(log => {
+      const actionStr = String(log.action || '');
+      return [
+        safeFormat(log.created_at, 'yyyy-MM-dd', ''),
+        safeFormat(log.created_at, 'HH:mm:ss', ''),
+        ACTION_CONFIG[actionStr]?.label || actionStr,
+        log.resource_type || '',
+        JSON.stringify(log.details || {}),
+      ];
+    });
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -232,10 +258,19 @@ export default function ActivityLogPage() {
       <Card>
         <CardContent className="pt-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex items-center gap-2 flex-1">
-              <Filter className="w-4 h-4 text-muted-foreground" />
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input 
+                placeholder="Search activity..." 
+                className="pl-9 bg-white w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
+              <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
               <Select value={filterAction} onValueChange={setFilterAction}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Filter by action" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +296,7 @@ export default function ActivityLogPage() {
                 value={selectedOrgId || 'personal'} 
                 onValueChange={(v) => setSelectedOrgId(v === 'personal' ? undefined : v)}
               >
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-full sm:w-[200px] shrink-0">
                   <SelectValue placeholder="Select scope" />
                 </SelectTrigger>
                 <SelectContent>
@@ -299,24 +334,33 @@ export default function ActivityLogPage() {
           ) : (
             <div className="space-y-1">
               {filteredLogs.map((log, index) => {
-                const config = ACTION_CONFIG[log.action] || { 
+                const actionStr = String(log.action || '');
+                const config = ACTION_CONFIG[actionStr] || { 
                   icon: Activity, 
-                  label: log.action, 
+                  label: actionStr, 
                   color: 'text-muted-foreground',
                   iconBg: 'bg-muted',
                   border: 'border-muted'
                 };
                 const Icon = config.icon;
                 const isNewDay = index === 0 || 
-                  format(new Date(log.created_at), 'yyyy-MM-dd') !== 
-                  format(new Date(filteredLogs[index - 1].created_at), 'yyyy-MM-dd');
+                  safeFormat(log.created_at, 'yyyy-MM-dd') !== 
+                  safeFormat(filteredLogs[index - 1].created_at, 'yyyy-MM-dd');
+
+                let parsedDetails = log.details;
+                if (typeof parsedDetails === 'string') {
+                  try { parsedDetails = JSON.parse(parsedDetails); } catch (e) {}
+                }
+                const hasDetails = parsedDetails && (typeof parsedDetails === 'object' ? Object.keys(parsedDetails).length > 0 : String(parsedDetails).trim().length > 0);
+                const fileId = parsedDetails?.fileId;
+                const fileName = parsedDetails?.fileName || 'document';
 
                 return (
                   <div key={log.id}>
                     {isNewDay && (
                       <div className="sticky top-0 bg-background py-2 mt-4 first:mt-0 z-10">
                         <p className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                          {format(new Date(log.created_at), 'EEEE, MMMM d, yyyy')}
+                          {safeFormat(log.created_at, 'EEEE, MMMM d, yyyy')}
                         </p>
                       </div>
                     )}
@@ -333,20 +377,20 @@ export default function ActivityLogPage() {
                             </Badge>
                           )}
                         </div>
-                        {Object.keys(log.details).length > 0 && (
+                        {hasDetails && (
                           <p className="text-sm text-muted-foreground mt-0.5 truncate">
                             {formatDetails(log.details)}
                           </p>
                         )}
-                        {log.action === 'FILE_ENCRYPTED_STORED' && log.details.fileId && (
+                        {actionStr === 'FILE_ENCRYPTED_STORED' && fileId && (
                            <Button
                              variant="outline"
                              size="sm"
                              className="mt-2 h-8 text-xs"
                              onClick={() => setDecryptLog({
                                id: log.id, 
-                               fileId: log.details.fileId, 
-                               fileName: log.details.fileName || 'document'
+                               fileId: fileId, 
+                               fileName: fileName
                              })}
                              disabled={actionLoading === `download-${log.id}`}
                            >
@@ -367,7 +411,7 @@ export default function ActivityLogPage() {
                           {actionLoading === `clear-${log.id}` ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />}
                         </Button>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(log.created_at), 'h:mm a')}
+                          {safeFormat(log.created_at, 'h:mm a')}
                         </span>
                       </div>
                     </div>

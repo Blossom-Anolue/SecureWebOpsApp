@@ -141,9 +141,13 @@ export default function Home() {
           <div className="absolute -bottom-[30%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-500/5 blur-3xl" />
         </div>
         <div className="container mx-auto px-4 py-24 md:py-32 relative">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
+        <div className="max-w-3xl mx-auto text-center space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
             {/* Badge/tagline */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
               <Lock className="w-4 h-4" />
               Simple security for small businesses
             </div>
@@ -217,9 +221,9 @@ export default function Home() {
           </div>
           
           {/* Feature cards grid */}
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150 fill-mode-both">
             {features.map((feature) => (
-              <Card key={feature.title} variant="interactive" className="group">
+              <Card key={feature.title} variant="interactive" className="group hover:shadow-lg hover:border-primary/40 transition-all duration-300 hover:-translate-y-1">
                 <CardContent className="p-6">
                   {/* Feature icon */}
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
@@ -262,8 +266,10 @@ export default function Home() {
             </div>
             
             {/* Right column: Score preview card */}
-            <Card className="p-6 md:p-8">
-              <div className="space-y-6">
+            <Card className="p-6 md:p-8 relative overflow-hidden group hover:shadow-xl transition-all duration-500 border-primary/20">
+              <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-500"></div>
+              <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-500"></div>
+              <div className="relative z-10 space-y-6">
                 {/* Score header */}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Your Security Score</span>

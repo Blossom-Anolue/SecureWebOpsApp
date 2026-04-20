@@ -92,12 +92,12 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
           <div className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="recipient-input" className="text-xs font-bold uppercase tracking-tight text-slate-500">
-                Recipient Email or User ID
+                Recipient Email or Username
               </Label>
               <Input 
                 id="recipient-input"
                 type="text" 
-                placeholder="user@example.com OR User ID"
+                placeholder="Enter Email or Username"
                 className="w-full px-4 py-5 border-slate-200 rounded-xl focus-visible:ring-primary"
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
@@ -105,7 +105,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
               <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2 space-y-2">
                 <p className="text-xs text-slate-600 flex items-start gap-2">
                   <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>For maximum security, sharing via User ID is recommended. Users can find their ID in Settings.</span>
+                  <span>For maximum security, carefully verify the recipient's Email or Username before sharing.</span>
                 </p>
                 <p className="text-xs text-slate-600 flex items-start gap-2">
                   <Lock className="w-4 h-4 text-blue-500 shrink-0" />

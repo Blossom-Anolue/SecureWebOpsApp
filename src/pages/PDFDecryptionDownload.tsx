@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, Share2, FileText, Lock, Trash2, Loader2, FileUp } from 'lucide-react';
+import { Download, Share2, FileText, Lock, Trash2, Loader2, FileUp, RefreshCw, UploadCloud, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import FileSharing from '@/pages/FileSharing';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useActivityLogger } from '@/hooks/useActivityLog';
 
 export default function PDFDecryptionDownload() {
@@ -20,12 +21,18 @@ export default function PDFDecryptionDownload() {
     const [isClearingAll, setIsClearingAll] = useState(false);
     const [decryptFile, setDecryptFile] = useState<{id: string, name: string} | null>(null);
     const [decryptEmail, setDecryptEmail] = useState('');
+    const [isRecoverOpen, setIsRecoverOpen] = useState(false);
+    const [recoverFile, setRecoverFile] = useState<File | null>(null);
+    const [isRecovering, setIsRecovering] = useState(false);
+    const [isRecoverDragging, setIsRecoverDragging] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
     const { log } = useActivityLogger();
     const navigate = useNavigate();
-    const adminFiles = files.filter((item) => item.permission_level === 'ADMIN' && item.file?.id);
-    const ownedFiles = files.filter((item) => item.owned);
-    const sharedFiles = files.filter((item) => !item.owned);
+    const filteredFiles = files.filter(item => item.file?.file_name?.toLowerCase().includes(searchQuery.toLowerCase()));
+    const adminFiles = filteredFiles.filter((item) => item.permission_level === 'ADMIN' && item.file?.id);
+    const ownedFiles = filteredFiles.filter((item) => item.owned);
+    const sharedFiles = filteredFiles.filter((item) => !item.owned);
 
     const loadFiles = useCallback(async () => {
         if (!user?.id || !session?.access_token) return;
@@ -81,7 +88,9 @@ export default function PDFDecryptionDownload() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = name.replace('.enc', '');
+            let downloadName = name.replace(/\.enc$/i, '');
+            if (!downloadName.toLowerCase().endsWith('.pdf')) downloadName += '.pdf';
+            a.download = downloadName;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -118,7 +127,8 @@ export default function PDFDecryptionDownload() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = name.endsWith('.enc') ? name : `${name}.enc`;
+            let downloadName = name.replace(/\.enc$/i, '').replace(/\.pdf$/i, '');
+            a.download = downloadName + '_encrypted.pdf';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -243,6 +253,100 @@ export default function PDFDecryptionDownload() {
 
     useEffect(() => { loadFiles(); }, [loadFiles]);
 
+    const handleRecoverDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsRecoverDragging(true);
+    };
+
+    const handleRecoverDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsRecoverDragging(false);
+    };
+
+    const handleRecoverDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsRecoverDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            setRecoverFile(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleRecoverFile = async () => {
+        if (!recoverFile) return;
+        setIsRecovering(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Your session has expired.");
+
+            const formData = new FormData();
+            formData.append('file', recoverFile);
+
+            const res = await fetch('/api/pdf/decrypt-external', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session.access_token}` },
+                body: formData
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Recovery failed.");
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const contentDisposition = res.headers.get('Content-Disposition');
+            let filename = `recovered_${recoverFile.name.replace(/\.enc$/i, '').replace(/_encrypted\.pdf$/i, '.pdf')}.pdf`;
+            if (contentDisposition && contentDisposition.includes('filename=')) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match && match[1]) filename = match[1];
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+            log('FILE_DECRYPT_SUCCESS' as any, 'file', {
+                details: { fileName: filename, recovery: true }
+            });
+            
+            toast({ title: "Recovery Successful", description: "Your file has been securely decrypted.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+            setIsRecoverOpen(false);
+            setRecoverFile(null);
+        } catch (err: any) {
+            toast({ title: "Recovery Failed", description: err.message, variant: "destructive" });
+        } finally {
+            setIsRecovering(false);
+        }
+    };
+
+    const handleRemoveShared = async (fileId: string, fileName: string) => {
+        if (!window.confirm(`Are you sure you want to remove "${fileName}" from your vault? You will lose access to this shared file.`)) return;
+
+        toast({ title: "Removing File...", description: `Removing ${fileName} from your vault.` });
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`/api/pdf/share/${fileId}/remove`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Removal failed");
+            }
+
+            toast({ title: "File Removed", description: "The shared document was removed from your vault." });
+            loadFiles();
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
+        }
+    };
+
     const renderFileGroup = (items: any[], emptyMessage: string) => {
         if (items.length === 0) {
             return (
@@ -323,6 +427,15 @@ export default function PDFDecryptionDownload() {
                                     </button>
                                 </>
                             )}
+                        {!item.owned && (
+                            <button 
+                                onClick={() => handleRemoveShared(item.file.id, item.file.file_name)} 
+                                className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                                title="Remove from my vault"
+                            >
+                                <Trash2 size={20}/>
+                            </button>
+                        )}
                         </div>
                     </div>
                 ))}
@@ -338,6 +451,10 @@ export default function PDFDecryptionDownload() {
                     <p className="text-sm text-slate-500">Decrypt, share, and manage encrypted files already stored in the vault.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setIsRecoverOpen(true)}>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Recover File
+                    </Button>
                     <Button variant="outline" onClick={() => navigate('/encrypt')}>
                         <FileUp className="w-4 h-4 mr-2" />
                         Encrypt New File
@@ -368,33 +485,59 @@ export default function PDFDecryptionDownload() {
                     </Button>
                 </div>
             ) : (
-                <div className="space-y-6">
-                    <section>
-                        <div className="rounded-t-xl border bg-emerald-50/70 px-4 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <h3 className="font-semibold text-slate-900">My Files</h3>
-                                    <p className="text-xs text-slate-500">Files you uploaded and fully manage.</p>
-                                </div>
-                                <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">{ownedFiles.length}</Badge>
-                            </div>
+                <Tabs defaultValue="my-files" className="w-full">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                        <TabsList className="grid w-full sm:w-[400px] grid-cols-2 shrink-0">
+                            <TabsTrigger value="my-files" className="gap-2">
+                                My Files
+                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] leading-none rounded-full">{ownedFiles.length}</Badge>
+                            </TabsTrigger>
+                            <TabsTrigger value="shared" className="gap-2">
+                                Shared With Me
+                                <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] leading-none rounded-full">{sharedFiles.length}</Badge>
+                            </TabsTrigger>
+                        </TabsList>
+                        <div className="relative w-full sm:w-64 shrink-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input 
+                                placeholder="Search files..." 
+                                className="pl-9 bg-white w-full"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
                         </div>
-                        {renderFileGroup(ownedFiles, 'You have not uploaded any encrypted files yet.')}
-                    </section>
+                    </div>
 
-                    <section>
-                        <div className="rounded-t-xl border bg-blue-50/70 px-4 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <h3 className="font-semibold text-slate-900">Shared With Me</h3>
-                                    <p className="text-xs text-slate-500">Files other people have granted you access to.</p>
+                    <TabsContent value="my-files" className="mt-0">
+                        <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="rounded-t-xl border bg-emerald-50/70 px-4 py-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-semibold text-slate-900">My Files</h3>
+                                        <p className="text-xs text-slate-500">Files you uploaded and fully manage.</p>
+                                    </div>
+                                    <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">{ownedFiles.length}</Badge>
                                 </div>
-                                <Badge variant="outline" className="border-blue-200 bg-white text-blue-700">{sharedFiles.length}</Badge>
                             </div>
-                        </div>
-                        {renderFileGroup(sharedFiles, 'Files shared with you will appear here.')}
-                    </section>
-                </div>
+                            {renderFileGroup(ownedFiles, 'You have not uploaded any encrypted files yet.')}
+                        </section>
+                    </TabsContent>
+
+                    <TabsContent value="shared" className="mt-0">
+                        <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="rounded-t-xl border bg-blue-50/70 px-4 py-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-semibold text-slate-900">Shared With Me</h3>
+                                        <p className="text-xs text-slate-500">Files other people have granted you access to.</p>
+                                    </div>
+                                    <Badge variant="outline" className="border-blue-200 bg-white text-blue-700">{sharedFiles.length}</Badge>
+                                </div>
+                            </div>
+                            {renderFileGroup(sharedFiles, 'Files shared with you will appear here.')}
+                        </section>
+                    </TabsContent>
+                </Tabs>
             )}
 
             {sharingFile && (
@@ -457,6 +600,101 @@ export default function PDFDecryptionDownload() {
                             disabled={!decryptEmail}
                         >
                             Confirm & Decrypt
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isRecoverOpen} onOpenChange={(open) => {
+                if (!open) {
+                    setIsRecoverOpen(false);
+                    setRecoverFile(null);
+                }
+            }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Recover Encrypted File</DialogTitle>
+                        <DialogDescription>
+                            Upload a raw encrypted file (e.g. <code className="text-xs bg-slate-100 px-1 rounded">_encrypted.pdf</code>) to securely verify ownership and decrypt it.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div 
+                            className={`relative group border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center space-y-4 transition-all ${
+                                recoverFile
+                                    ? 'border-primary bg-primary/5' 
+                                    : isRecoverDragging
+                                    ? 'border-primary bg-primary/10 scale-[1.02]'
+                                    : 'border-slate-300 hover:border-primary/50 hover:bg-slate-50'
+                            }`}
+                            onDragOver={handleRecoverDragOver}
+                            onDragLeave={handleRecoverDragLeave}
+                            onDrop={handleRecoverDrop}
+                        >
+                            <div className={`p-3 rounded-full transition-colors ${recoverFile ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                {recoverFile ? <FileText className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
+                            </div>
+                            
+                            <div className="text-center relative z-10">
+                                <p className="font-medium text-sm text-slate-800">
+                                    {recoverFile ? recoverFile.name : "Drag & drop your encrypted file here"}
+                                </p>
+                                {recoverFile && (
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        {(recoverFile.size / 1024).toFixed(1)} KB
+                                    </p>
+                                )}
+                            </div>
+                            
+                            <input 
+                                type="file" 
+                                accept=".pdf,.enc" 
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                        setRecoverFile(e.target.files[0]);
+                                    }
+                                }}
+                                className="hidden" 
+                                id="recover-upload"
+                            />
+                            {!recoverFile && (
+                                <label 
+                                    htmlFor="recover-upload" 
+                                    className="relative z-10 px-4 py-2 rounded-full cursor-pointer text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:border-primary/30 hover:text-primary transition-all shadow-sm"
+                                >
+                                    Browse Files
+                                </label>
+                            )}
+                            {recoverFile && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => setRecoverFile(null)} 
+                                    className="text-xs text-red-500 hover:underline mt-2"
+                                >
+                                    Remove file
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setIsRecoverOpen(false);
+                            setRecoverFile(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleRecoverFile}
+                            disabled={!recoverFile || isRecovering}
+                        >
+                            {isRecovering ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Recovering...
+                                </>
+                            ) : (
+                                "Upload & Decrypt"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

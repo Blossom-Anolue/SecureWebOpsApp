@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../services/supabaseAdmin.js';
 import { encryptPDF } from '../services/encryptionServices.js';
 import { retrieveAndDecryptFile } from '../services/SecureAccessController.js'; // Import the centralized decryption logic
+import { decryptPDF } from '../services/decryptionServices.js';
 import { logEvent } from '../services/auditService.js';
 
 // --- EMAIL SERVICE CONFIGURATION ---
@@ -192,7 +193,8 @@ function sanitizeStorageSegment(value) {
         .replace(/[^\w.\- ]+/g, '_')
         .replace(/\s+/g, '_')
         .replace(/_+/g, '_')
-        .replace(/^_+|_+$/g, '');
+        .replace(/^[\._]+|[\._]+$/g, '') // SECURITY: Block hidden files and leading dots/underscores
+        .substring(0, 200); // SECURITY: Prevent extremely long buffer-overflow filenames
 
     return normalized || 'document.pdf';
 }
@@ -425,7 +427,7 @@ async function findAuthUserByEmail(email) {
 async function resolveShareRecipient(targetUserId, requester = null) {
     const recipient = String(targetUserId || '').trim();
     if (!recipient) {
-        return { error: { status: 400, message: "Recipient Email or User ID is required." } };
+        return { error: { status: 400, message: "Recipient Email or Username is required." } };
     }
 
     const requesterEmail = String(requester?.email || '').trim().toLowerCase();
@@ -453,7 +455,7 @@ async function resolveShareRecipient(targetUserId, requester = null) {
 
         const { data, error } = await supabaseAdmin.auth.admin.getUserById(recipient);
         if (error || !data?.user) {
-            return { error: { status: 404, message: "User not found with that User ID." } };
+            return { error: { status: 404, message: "User not found with that ID." } };
         }
 
         return {
@@ -466,18 +468,26 @@ async function resolveShareRecipient(targetUserId, requester = null) {
         };
     }
 
-    const { data: userProfile, error: profileErr } = await supabase
+    let { data: userProfile, error: profileErr } = await supabase
         .from('profiles')
         .select('id, email, full_name, username')
         .ilike('email', recipient)
         .maybeSingle();
+
+    if (!userProfile && !profileErr) {
+        ({ data: userProfile, error: profileErr } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, username')
+            .ilike('username', recipient)
+            .maybeSingle());
+    }
 
     if (profileErr) throw profileErr;
 
     if (!userProfile) {
         const authUser = await findAuthUserByEmail(recipient);
         if (!authUser) {
-            return { error: { status: 404, message: "User not found with that email address. Make sure they have an account." } };
+            return { error: { status: 404, message: "User not found with that email address or username. Make sure they have an account." } };
         }
 
         return {
@@ -675,9 +685,9 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
     }
 
     const mimeType = req.file.mimetype || 'application/octet-stream';
-    const isPdf = mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+    const isPdf = fileName.toLowerCase().endsWith('.pdf'); // STRICT SECURITY: Trust only the extension, not the spoofable MIME
     if (!isPdf) {
-        return res.status(400).json({ error: "Only PDF files are supported." });
+        return res.status(400).json({ error: "Security Policy: Only files ending in .pdf are permitted." });
     }
 
     console.log('Starting encryption');
@@ -808,9 +818,12 @@ router.get('/download/:fileId', checkPermission('VIEW'), async (req, res) => {
         // Use the centralized secure access controller for retrieval and decryption
         const { buffer: decryptedBuffer, fileName, mimeType } = await retrieveAndDecryptFile(userId, fileId); 
 
+        let safeName = sanitizeStorageSegment(fileName);
+        if (!safeName.toLowerCase().endsWith('.pdf')) safeName += '.pdf';
+
         // The logEvent for success is already handled within retrieveAndDecryptFile
         res.setHeader('Content-Type', mimeType || 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${sanitizeStorageSegment(fileName)}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
         res.send(decryptedBuffer);
     } catch (error) {
         // 5. COMPLIANCE: Log the failure for security monitoring
@@ -871,8 +884,12 @@ router.get('/raw/:fileId', checkPermission('DOWNLOAD'), async (req, res) => {
             }).catch(() => {});
         }
 
+        const baseName = String(file.original_file_name || file.encrypted_file_name || 'document').replace(/\.enc$/i, '').replace(/\.pdf$/i, '');
+        let safeName = sanitizeStorageSegment(baseName + '_encrypted.pdf');
+        if (!safeName.toLowerCase().endsWith('.pdf')) safeName += '.pdf';
+
         res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${sanitizeStorageSegment(file.encrypted_file_name || file.original_file_name + '.enc')}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
         res.send(buffer);
     } catch (error) {
         console.error("Raw Download Error:", error);
@@ -1090,6 +1107,59 @@ router.post('/share/:fileId/revoke', checkPermission('ADMIN'), async (req, res) 
     }
 });
 
+// --- REMOVE SELF FROM SHARED FILE ---
+router.delete('/share/:fileId/remove', async (req, res) => {
+    const { fileId } = req.params;
+    const userId = req.user?.id;
+
+    try {
+        let data;
+        let error;
+        if (PDF_HARDENED_SCHEMA) {
+            ({ data, error } = await supabase
+                .from('file_permissions')
+                .update({
+                    revoked_at: new Date().toISOString(),
+                    revoked_by: userId,
+                    revoke_reason: 'Self-revoked by user'
+                })
+                .eq('file_id', fileId)
+                .eq('user_id', userId)
+                .is('revoked_at', null)
+                .select('id')
+                .maybeSingle());
+
+            if (error && isMissingColumnError(error, ['revoked_at', 'revoked_by', 'revoke_reason'])) {
+                ({ data, error } = await supabase
+                    .from('file_permissions')
+                    .delete()
+                    .eq('file_id', fileId)
+                    .eq('user_id', userId)
+                    .select('id')
+                    .maybeSingle());
+            }
+        } else {
+            ({ data, error } = await supabase
+                .from('file_permissions')
+                .delete()
+                .eq('file_id', fileId)
+                .eq('user_id', userId)
+                .select('id')
+                .maybeSingle());
+        }
+
+        if (error) throw error;
+        if (!data) {
+            return res.status(404).json({ error: "Active share not found." });
+        }
+
+        res.json({ message: 'File removed from your vault successfully.' });
+    } catch (error) {
+        console.error('REMOVE SHARED ERROR:', error);
+        res.status(500).json({ error: 'Failed to remove shared file.' });
+    }
+});
+
 // --- GET RECENT (Fallback for components that might still poll it) ---
 router.get('/recent', async (req, res) => {
     try {
@@ -1221,6 +1291,109 @@ router.delete('/:fileId', checkPermission('ADMIN'), async (req, res) => {
     } catch (err) {
         console.error("Purge Error:", err.message);
         res.status(500).json({ error: "Delete failed.", details: err.message });
+    }
+});
+
+// --- SECURE EXTERNAL UPLOAD & DECRYPT RECOVERY ---
+router.post('/decrypt-external', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No encrypted file provided." });
+        }
+
+        const userId = req.user.id;
+        const uploadedBuffer = req.file.buffer;
+
+        // Determine if user is a Global System Admin (can recover orphan/deleted files)
+        const userEmail = req.user.email?.toLowerCase();
+        const adminEmails = String(process.env.SYSTEM_ADMIN_EMAILS || '')
+            .toLowerCase()
+            .split(',')
+            .map(e => e.trim())
+            .filter(e => e);
+        const isSystemAdmin = req.user.app_metadata?.role === 'admin' || req.user.app_metadata?.role === 'superadmin' || adminEmails.includes(userEmail);
+
+        // 1. Hash the uploaded file to cryptographically identify it in the database
+        const fileHash = computeEncryptedBlobSha256(uploadedBuffer);
+
+        let { data: fileRecord, error: dbError } = await supabase
+            .from('encrypted_pdfs')
+            .select('id, user_id, organization_id, original_file_name')
+            .eq('encrypted_sha256', fileHash)
+            .maybeSingle();
+
+        // 1.5 Auto-Heal Old Files: If hash lookup fails (old file), try matching the filename
+        if (!fileRecord) {
+            const possibleOriginalName = req.file.originalname.replace(/_encrypted\.pdf$/i, '.pdf').replace(/\.enc$/i, '.pdf');
+            const { data: legacyRecord } = await supabase
+                .from('encrypted_pdfs')
+                .select('id, user_id, organization_id, original_file_name')
+                .eq('original_file_name', possibleOriginalName)
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (legacyRecord) {
+                fileRecord = legacyRecord;
+                // Heal the database by saving the hash for future strict lookups
+                const { error: healError } = await supabase.from('encrypted_pdfs').update({ encrypted_sha256: fileHash }).eq('id', fileRecord.id);
+                if (healError) console.warn("[RECOVERY] Auto-heal failed:", healError.message);
+            }
+        }
+
+        // 2. Validate Access (Personal vs Company)
+        let isAuthorized = false;
+
+        if (fileRecord) {
+            // Condition A: Personal File (User is the direct owner)
+            if (fileRecord.user_id === userId) {
+                isAuthorized = true;
+            } 
+            // Condition B: Company File (User is an admin/owner of the organization)
+            else if (fileRecord.organization_id) {
+                const { data: orgMember } = await supabase
+                    .from('organization_members')
+                    .select('role')
+                    .eq('organization_id', fileRecord.organization_id)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+
+                if (orgMember && (orgMember.role === 'owner' || orgMember.role === 'admin')) {
+                    isAuthorized = true;
+                }
+            }
+        }
+
+        // Fallback: If no database record is found (e.g., file was deleted) or user isn't the owner, allow System Admins to recover it.
+        if (!isAuthorized && isSystemAdmin) {
+            isAuthorized = true;
+        }
+
+        if (!isAuthorized) {
+            console.error(`[RECOVERY DENIED] User: ${userEmail} | FileHash: ${fileHash} | isSystemAdmin: ${isSystemAdmin} | FileRecordFound: ${!!fileRecord}`);
+            await logEvent({
+                action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+                status: 'BLOCKED',
+                user: userId,
+                fileId: fileRecord?.id || 'UNKNOWN_ORPHAN_FILE',
+                details: 'Blocked attempt to decrypt raw file upload. Missing RBAC or System Admin privileges.'
+            });
+            return res.status(403).json({ error: "Access Denied: Unrecognized file or you do not have permission to recover it." });
+        }
+
+        // 3. Authorized! Decrypt the file
+        const decryptedBuffer = decryptPDF(uploadedBuffer, MASTER_SECRET);
+        const originalName = fileRecord?.original_file_name || req.file.originalname.replace(/\.enc$/i, '').replace(/_encrypted\.pdf$/i, '.pdf');
+        
+        let safeName = sanitizeStorageSegment(`recovered_${originalName}`);
+        if (!safeName.toLowerCase().endsWith('.pdf')) safeName += '.pdf';
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.send(decryptedBuffer);
+
+    } catch (error) {
+        console.error("Secure Recovery Error:", error.message);
+        res.status(500).json({ error: "Decryption failed. The file may be tampered with." });
     }
 });
 
