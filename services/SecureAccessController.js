@@ -6,7 +6,7 @@ import crypto from 'crypto';
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const PDF_HARDENED_SCHEMA = false;
+const PDF_HARDENED_SCHEMA = true;
 
 function isMissingColumnError(error, columnNames = []) {
     const message = String(error?.message || '').toLowerCase();
@@ -83,12 +83,21 @@ export async function retrieveAndDecryptFile(userId, fileId) {
                 .from('file_permissions')
                 .select(PDF_HARDENED_SCHEMA
                     ? 'permission_level, expires_at, revoked_at, access_count'
-                    : 'permission_level')
+                    : 'permission_level, expires_at')
                 .eq('file_id', fileId)
                 .eq('user_id', userId)
                 .maybeSingle();
 
             if (PDF_HARDENED_SCHEMA && permError && isMissingColumnError(permError, ['expires_at', 'revoked_at', 'access_count'])) {
+                ({ data: perm, error: permError } = await supabase
+                    .from('file_permissions')
+                    .select('permission_level, expires_at')
+                    .eq('file_id', fileId)
+                    .eq('user_id', userId)
+                    .maybeSingle());
+            }
+
+            if (permError && isMissingColumnError(permError, ['expires_at'])) {
                 ({ data: perm, error: permError } = await supabase
                     .from('file_permissions')
                     .select('permission_level')
@@ -103,7 +112,7 @@ export async function retrieveAndDecryptFile(userId, fileId) {
 
             permissionEntry = perm;
 
-            if (isShareActive(permissionEntry) && (permissionEntry.permission_level === 'DOWNLOAD' || permissionEntry.permission_level === 'ADMIN')) {
+            if (isShareActive(permissionEntry) && (permissionEntry.permission_level === 'VIEW' || permissionEntry.permission_level === 'DOWNLOAD' || permissionEntry.permission_level === 'ADMIN')) {
                 isAuthorized = true;
                 accessLevel = permissionEntry.permission_level;
             }

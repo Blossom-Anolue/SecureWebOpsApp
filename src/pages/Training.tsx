@@ -39,10 +39,10 @@ type InteractiveLesson = {
 
 const interactiveLessons: InteractiveLesson[] = [
   {
-    id: 'spotting-phishing',
-    title: 'Spotting Phishing Emails',
-    description: 'Learn the common signs of phishing emails and how to protect yourself.',
-    duration: '5 min',
+    id: 'spotting-phishing-1',
+    title: 'Spotting Phishing Emails (Part 1)',
+    description: 'Learn the basics of phishing and common red flags.',
+    duration: '3 min',
     category: 'Email Security',
     steps: [
       {
@@ -60,17 +60,6 @@ const interactiveLessons: InteractiveLesson[] = [
           </ul>
         )
       },
-      {
-        title: "Before You Click",
-        content: (
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Pause and verify the request through a trusted channel like Teams, Slack, or a phone call.</li>
-            <li>Hover over links to inspect the real destination before opening them.</li>
-            <li>Be cautious with messages asking for passwords, MFA codes, wire transfers, or gift cards.</li>
-            <li>When in doubt, report the message instead of replying to it.</li>
-          </ul>
-        )
-      }
     ],
     quiz: [
       {
@@ -128,6 +117,28 @@ const interactiveLessons: InteractiveLesson[] = [
         correctIndex: 1,
         explanation: "Legitimate teams should never ask for your MFA code by email."
       },
+    ]
+  },
+  {
+    id: 'spotting-phishing-2',
+    title: 'Spotting Phishing Emails (Part 2)',
+    description: 'Learn what to do before clicking and how to respond safely.',
+    duration: '3 min',
+    category: 'Email Security',
+    steps: [
+      {
+        title: "Before You Click",
+        content: (
+          <ul className="list-disc pl-5 space-y-2">
+            <li>Pause and verify the request through a trusted channel like Teams, Slack, or a phone call.</li>
+            <li>Hover over links to inspect the real destination before opening them.</li>
+            <li>Be cautious with messages asking for passwords, MFA codes, wire transfers, or gift cards.</li>
+            <li>When in doubt, report the message instead of replying to it.</li>
+          </ul>
+        )
+      }
+    ],
+    quiz: [
       {
         question: "What is a look-alike domain?",
         options: [
@@ -197,10 +208,10 @@ const interactiveLessons: InteractiveLesson[] = [
     ]
   },
   {
-    id: 'secure-file-vault',
-    title: 'Using the Secure Vault',
-    description: 'Understand how AES-256-GCM encryption protects your uploaded PDFs.',
-    duration: '4 min',
+    id: 'secure-file-vault-1',
+    title: 'Using the Secure Vault (Part 1)',
+    description: 'Understand the basics of encryption and how our vault works.',
+    duration: '2 min',
     category: 'Data Protection',
     steps: [
       {
@@ -217,17 +228,6 @@ const interactiveLessons: InteractiveLesson[] = [
           </ul>
         )
       },
-      {
-        title: "What Good Vault Hygiene Looks Like",
-        content: (
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Upload only the files that truly need secure retention.</li>
-            <li>Name documents clearly so teammates can identify them without opening sensitive content unnecessarily.</li>
-            <li>Review who has access on a regular basis and remove stale permissions quickly.</li>
-            <li>Download and decrypt only when there is a clear business need.</li>
-          </ul>
-        )
-      }
     ],
     quiz: [
       {
@@ -285,6 +285,28 @@ const interactiveLessons: InteractiveLesson[] = [
         correctIndex: 2,
         explanation: "GCM helps detect tampering, which protects the integrity and authenticity of the encrypted data."
       },
+    ]
+  },
+  {
+    id: 'secure-file-vault-2',
+    title: 'Using the Secure Vault (Part 2)',
+    description: 'Learn about vault hygiene and best practices.',
+    duration: '2 min',
+    category: 'Data Protection',
+    steps: [
+      {
+        title: "What Good Vault Hygiene Looks Like",
+        content: (
+          <ul className="list-disc pl-5 space-y-2">
+            <li>Upload only the files that truly need secure retention.</li>
+            <li>Name documents clearly so teammates can identify them without opening sensitive content unnecessarily.</li>
+            <li>Review who has access on a regular basis and remove stale permissions quickly.</li>
+            <li>Download and decrypt only when there is a clear business need.</li>
+          </ul>
+        )
+      }
+    ],
+    quiz: [
       {
         question: "Which action best follows least-privilege principles in the vault?",
         options: [
@@ -354,10 +376,10 @@ const interactiveLessons: InteractiveLesson[] = [
     ]
   },
   {
-    id: 'safe-sharing',
-    title: 'Safe File Sharing',
-    description: 'Best practices for sharing access to encrypted documents.',
-    duration: '6 min',
+    id: 'safe-sharing-1',
+    title: 'Safe File Sharing (Part 1)',
+    description: 'Learn about least privilege and secure sharing via email.',
+    duration: '3 min',
     category: 'Access Control',
     steps: [
       {
@@ -365,19 +387,9 @@ const interactiveLessons: InteractiveLesson[] = [
         content: <p>When granting access to secure files, always follow the principle of least privilege: give users only the access they absolutely need to do their jobs, and nothing more.</p>
       },
       {
-        title: "Sharing by User ID",
-        content: <p>Instead of sharing via email which could be intercepted or spoofed, SecureWebOps allows sharing directly via a unique User ID. This creates a hard cryptographic link in the database that is much harder for attackers to exploit.</p>
+        title: "Sharing by Verified Email",
+        content: <p>Instead of sending unencrypted attachments via email, SecureWebOps allows sharing access directly via a verified email address. The system automatically resolves this to a secure user identity, making it user-friendly while maintaining a hard cryptographic link in the database.</p>
       },
-      {
-        title: "Access Reviews Matter",
-        content: (
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Remove access for contractors and former employees as soon as their work ends.</li>
-            <li>Grant temporary elevated access only for clearly defined tasks.</li>
-            <li>Document why access was granted so reviews are easier later.</li>
-          </ul>
-        )
-      }
     ],
     quiz: [
       {
@@ -395,23 +407,23 @@ const interactiveLessons: InteractiveLesson[] = [
         question: "Which sharing action is safest for a sensitive encrypted document?",
         options: [
           "Granting permanent admin access because the project might grow later.",
-          "Sharing by verified user ID with the smallest permission level needed.",
+          "Sharing by verified email address with the smallest permission level needed.",
           "Sending a decrypted copy over personal email for speed.",
           "Posting the link in a shared group chat."
         ],
         correctIndex: 1,
-        explanation: "Sharing by verified user ID with limited permissions protects the document while still enabling the task."
+        explanation: "Sharing by verified email address with limited permissions protects the document while still enabling the task."
       },
       {
-        question: "Why is sharing by verified user ID safer than sending files around casually?",
+        question: "Why is sharing access via a verified email address safer than sending files around casually?",
         options: [
           "It avoids any need for audit logs",
           "It reduces accountability",
-          "It ties access to a specific known identity in the system",
+          "It ties access to a specific known identity in the system without sending an attachment",
           "It makes files public only to trusted users"
         ],
         correctIndex: 2,
-        explanation: "Sharing by verified user ID improves traceability and reduces the chance of exposing files to the wrong recipient."
+        explanation: "Sharing by verified email address improves traceability and reduces the chance of exposing files to the wrong recipient."
       },
       {
         question: "What permission level should you grant when someone only needs to read a document?",
@@ -435,6 +447,27 @@ const interactiveLessons: InteractiveLesson[] = [
         correctIndex: 1,
         explanation: "Elevated access should be limited to situations where it is genuinely necessary."
       },
+    ]
+  },
+  {
+    id: 'safe-sharing-2',
+    title: 'Safe File Sharing (Part 2)',
+    description: 'Understand the importance of access reviews and temporary access.',
+    duration: '3 min',
+    category: 'Access Control',
+    steps: [
+      {
+        title: "Access Reviews Matter",
+        content: (
+          <ul className="list-disc pl-5 space-y-2">
+            <li>Remove access for contractors and former employees as soon as their work ends.</li>
+            <li>Grant temporary elevated access only for clearly defined tasks.</li>
+            <li>Document why access was granted so reviews are easier later.</li>
+          </ul>
+        )
+      }
+    ],
+    quiz: [
       {
         question: "Why should temporary access be removed after the task is done?",
         options: [
@@ -502,7 +535,7 @@ const interactiveLessons: InteractiveLesson[] = [
         explanation: "Contractor access should end when the work ends so unnecessary exposure does not continue."
       }
     ]
-  },
+  }
 ];
 
 export default function Training() {
@@ -591,12 +624,17 @@ export default function Training() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-display">Security Training</h1>
-        <p className="text-muted-foreground mt-1">
-          Learn to protect your business and test your team
-        </p>
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent p-6 md:p-8 border border-emerald-500/10">
+        <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+          <GraduationCap className="w-32 h-32 text-emerald-600" />
+        </div>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Security Training</h1>
+          <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
+            Learn to protect your business and test your team with interactive lessons.
+          </p>
+        </div>
       </div>
 
       {/* Progress Card */}
@@ -897,10 +935,9 @@ export default function Training() {
                 <div className="flex gap-2">
                   {!activeLesson.quiz.every((question, index) => quizAnswers[index] === question.correctIndex) && (
                     <Button variant="outline" onClick={() => {
-                      setQuizAnswers(Array(activeLesson.quiz.length).fill(-1));
                       setShowQuizResult(false);
                     }}>
-                      Try Again
+                      Review & Retry
                     </Button>
                   )}
                   <Button onClick={closeLesson}>

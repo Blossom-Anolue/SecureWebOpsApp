@@ -10,19 +10,35 @@ export async function retrieveAndDecryptFile(userId, fileId) {
     try {
         // 1. PRIVILEGE CHECK: Verify the user has 'DOWNLOAD' or 'ADMIN' rights
         // This prevents Privilege Escalation (e.g., a 'VIEW' user trying to download)
-        const { data: permission, error: permError } = await supabase
+        let { data: permission, error: permError } = await supabase
             .from('file_permissions')
-            .select('permission_level')
+            .select('permission_level, expires_at, revoked_at')
             .eq('file_id', fileId)
             .eq('user_id', userId)
             .single();
 
-        if (permError || !permission || (permission.permission_level !== 'DOWNLOAD' && permission.permission_level !== 'ADMIN')) {
+        if (permError && String(permError.message).includes('expires_at')) {
+            ({ data: permission, error: permError } = await supabase
+                .from('file_permissions')
+                .select('permission_level')
+                .eq('file_id', fileId)
+                .eq('user_id', userId)
+                .single());
+        }
+
+        if (permError || !permission || (permission.permission_level !== 'VIEW' && permission.permission_level !== 'DOWNLOAD' && permission.permission_level !== 'ADMIN')) {
             // LOG UNAUTHORIZED ATTEMPT
             await logAction(userId, 'UNAUTHORIZED_ACCESS_ATTEMPT', 'BLOCKED', fileId, {
                 reason: 'Insufficient permissions for decryption'
             });
             throw new Error("Access Denied: You do not have download privileges for this file.");
+        }
+
+        if (permission.revoked_at || (permission.expires_at && new Date(permission.expires_at).getTime() <= Date.now())) {
+            await logAction(userId, 'UNAUTHORIZED_ACCESS_ATTEMPT', 'BLOCKED', fileId, {
+                reason: 'Access expired or revoked'
+            });
+            throw new Error("Access Denied: Your access to this file has expired or been revoked.");
         }
 
         // 2. Fetch metadata from 'files' table

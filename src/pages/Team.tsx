@@ -247,9 +247,14 @@ export default function Team() {
   if ((!organizations || organizations.length === 0) && (!pendingInvites || pendingInvites.length === 0) && !invitesLoading) {
     return (
       <div className="space-y-6 pb-20 lg:pb-0">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Team Management</h1>
-          <p className="text-muted-foreground mt-1">Collaborate with your team on security</p>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-6 md:p-8 border border-indigo-500/10 mb-6">
+          <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+            <Users className="w-32 h-32 text-indigo-600" />
+          </div>
+          <div className="relative z-10">
+            <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Team Management</h1>
+            <p className="text-muted-foreground mt-2 text-lg">Collaborate with your team on security monitoring.</p>
+          </div>
         </div>
         
         <EmptyState
@@ -302,15 +307,18 @@ export default function Team() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Team Management</h1>
-          <p className="text-muted-foreground mt-1">Manage your team and access permissions</p>
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-6 md:p-8 border border-indigo-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+          <Users className="w-32 h-32 text-indigo-600" />
+        </div>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Team Management</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Manage your team and access permissions</p>
         </div>
         <Dialog open={isCreateOrgOpen} onOpenChange={setIsCreateOrgOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="relative z-10 shadow-md">
               <Plus className="w-4 h-4 mr-2" />
               New Team
             </Button>
@@ -596,11 +604,13 @@ export default function Team() {
           <div className="grid sm:grid-cols-2 gap-4">
             {Object.entries(ROLE_CONFIG).map(([role, config]) => {
               const Icon = config.icon;
+              const bgBorderClass = config.color.replace('text-', 'bg-');
               return (
-                <div key={role} className="p-3 rounded-lg border">
-                  <div className="flex items-center gap-2 mb-2">
+                <div key={role} className="p-4 rounded-xl border bg-gradient-to-br from-white to-slate-50 shadow-sm relative overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
+                  <div className={`absolute top-0 left-0 w-1 h-full ${bgBorderClass}`} />
+                  <div className="flex items-center gap-2 mb-2 relative z-10">
                     <Icon className={`w-4 h-4 ${config.color}`} />
-                    <span className="font-medium">{config.label}</span>
+                    <span className="font-bold text-slate-800">{config.label}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {role === 'owner' && 'Full control including team deletion'}

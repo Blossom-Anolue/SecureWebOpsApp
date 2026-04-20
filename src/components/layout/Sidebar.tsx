@@ -67,9 +67,10 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
     <aside className="w-72 h-screen bg-sidebar text-sidebar-foreground flex flex-col">
       {/* Header */}
       <div className="p-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
-            <Shield className="w-5 h-5 text-sidebar-primary-foreground" />
+        <div className="flex items-center gap-3 group cursor-default">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-lg shadow-primary/20 border border-white/20 relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 w-full h-full transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"></div>
+            <Shield className="w-5 h-5 text-white drop-shadow-md relative z-10" />
           </div>
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-white leading-none drop-shadow-sm">

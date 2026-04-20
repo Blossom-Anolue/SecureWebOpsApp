@@ -55,6 +55,7 @@ const ACTION_CONFIG: Record<string, { icon: typeof Activity; label: string; colo
   // File Vault Access (Sky)
   'FILE_DECRYPT_SUCCESS': { icon: Unlock, label: 'File Decrypted', color: 'text-sky-500', iconBg: 'bg-sky-500/10', border: 'border-sky-500' },
   'ACCESS_GRANTED': { icon: Share2, label: 'Vault Access Granted', color: 'text-sky-500', iconBg: 'bg-sky-500/10', border: 'border-sky-500' },
+  'FILE_DOWNLOAD_RAW': { icon: Lock, label: 'Raw File Downloaded', color: 'text-slate-500', iconBg: 'bg-slate-500/10', border: 'border-slate-500' },
 
   // Success (Severity Low / Green)
   'scan.completed': { icon: Shield, label: 'Scan Completed', color: 'text-severity-low', iconBg: 'bg-severity-low-bg', border: 'border-severity-low' },
@@ -64,6 +65,7 @@ const ACTION_CONFIG: Record<string, { icon: typeof Activity; label: string; colo
   // Error & Destructive (Destructive / Red)
   'scan.failed': { icon: Shield, label: 'Scan Failed', color: 'text-destructive', iconBg: 'bg-destructive/10', border: 'border-destructive' },
   'FILE_DECRYPT_FAILURE': { icon: ShieldAlert, label: 'Decryption Failed', color: 'text-destructive', iconBg: 'bg-destructive/10', border: 'border-destructive' },
+  'FILE_DOWNLOAD_RAW_FAILURE': { icon: ShieldAlert, label: 'Raw Download Failed', color: 'text-destructive', iconBg: 'bg-destructive/10', border: 'border-destructive' },
   'UNAUTHORIZED_ACCESS': { icon: ShieldAlert, label: 'Access Blocked', color: 'text-destructive', iconBg: 'bg-destructive/10', border: 'border-destructive' },
   'UNAUTHORIZED_ACCESS_ATTEMPT': { icon: ShieldAlert, label: 'Access Blocked', color: 'text-destructive', iconBg: 'bg-destructive/10', border: 'border-destructive' },
 
@@ -194,13 +196,27 @@ export default function ActivityLogPage() {
 
   return (
     <div className="space-y-6 p-4 lg:p-8 max-w-6xl mx-auto pb-20 lg:pb-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Activity Log</h1>
-          <p className="text-muted-foreground mt-1">Track all actions for compliance and auditing</p>
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800 p-6 md:p-8 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+        <div className="absolute -right-6 -bottom-6 opacity-5 pointer-events-none">
+          <Activity className="w-48 h-48 text-slate-900 dark:text-white" />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Activity Log</h1>
+          <div className="mt-2 space-y-2">
+            <p className="text-muted-foreground text-lg">Track all actions for compliance and auditing</p>
+            {organizations && organizations.length > 0 ? (
+              <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 inline-block px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                ✓ Enterprise Retention Active: 1-7 Years (SOC2/HIPAA)
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground bg-muted inline-block px-2 py-0.5 rounded border">
+                Personal Retention: 30 Days (Upgrade for 7-year compliance)
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="relative z-10 flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleClearAll} disabled={!filteredLogs?.length || actionLoading === 'clear-all'}>
             <Trash2 className="w-4 h-4 mr-2" />
             {actionLoading === 'clear-all' ? 'Clearing...' : 'Clear All'}
@@ -233,6 +249,7 @@ export default function ActivityLogPage() {
                   <SelectItem value="settings.updated">Settings Updates</SelectItem>
                   <SelectItem value="FILE_ENCRYPTED_STORED">Vault Encryptions</SelectItem>
                   <SelectItem value="FILE_DECRYPT_SUCCESS">Vault Decryptions</SelectItem>
+                  <SelectItem value="FILE_DOWNLOAD_RAW">Raw File Downloads</SelectItem>
                   <SelectItem value="ACCESS_GRANTED">Access Granted</SelectItem>
                   <SelectItem value="FILE_PURGED">Files Purged</SelectItem>
                   <SelectItem value="UNAUTHORIZED_ACCESS_ATTEMPT">Security Blocks</SelectItem>
@@ -434,8 +451,24 @@ export default function ActivityLogPage() {
     </div>
   );
 }
+function formatDetails(rawDetails: any): string {
+  if (!rawDetails) return '';
+  
+  let details = rawDetails;
+  
+  // Force parse if the database returned a stringified JSON object
+  if (typeof rawDetails === 'string') {
+    try {
+      details = JSON.parse(rawDetails);
+    } catch (e) {
+      return rawDetails; // It's just normal text, return it
+    }
+  }
 
-function formatDetails(details: Record<string, any>): string {
+  if (typeof details !== 'object' || details === null) {
+    return String(details);
+  }
+
   const parts: string[] = [];
   
   if (details.domain) parts.push(`Domain: ${details.domain}`);
@@ -444,7 +477,36 @@ function formatDetails(details: Record<string, any>): string {
   if (details.role) parts.push(`Role: ${details.role}`);
   if (details.name) parts.push(details.name);
   if (details.fileName) parts.push(`File: ${details.fileName}`);
-  if (details.details) parts.push(details.details);
+  if (details.sharedWith) parts.push(`Shared with: ${details.sharedWith}`);
+  if (details.permissionLevel) parts.push(`Permission: ${details.permissionLevel}`);
+  if (details.expiresAt) parts.push(`Expires: ${details.expiresAt}`);
+  if (details.error) parts.push(`Error: ${details.error}`);
+  if (details.message) parts.push(details.message);
+  if (details.details) {
+    let nestedDetails = details.details;
+    
+    // Try to parse the nested details if it's a stringified JSON object
+    if (typeof nestedDetails === 'string') {
+      try {
+        const parsed = JSON.parse(nestedDetails);
+        if (typeof parsed === 'object' && parsed !== null) {
+          nestedDetails = parsed;
+        }
+      } catch (e) {
+        // Keep as normal string if parsing fails
+      }
+    }
+
+    if (typeof nestedDetails === 'string') {
+      parts.push(nestedDetails);
+    } else if (typeof nestedDetails === 'object' && nestedDetails !== null) {
+      if (nestedDetails.message) {
+        parts.push(nestedDetails.message);
+      } else {
+        parts.push(JSON.stringify(nestedDetails));
+      }
+    }
+  }
 
 
   return parts.join(' • ') || JSON.stringify(details);

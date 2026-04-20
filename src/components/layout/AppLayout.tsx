@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Search, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePresence } from '@/hooks/usePresence';
 import { useOrganizations } from '@/hooks/useOrganizations';
@@ -77,11 +77,12 @@ export function AppLayout() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">CS</span>
+          <div className="flex items-center gap-2 group cursor-default">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-md shadow-primary/20 border border-white/20 relative overflow-hidden">
+              <div className="absolute inset-0 bg-white/10 w-full h-full transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"></div>
+              <Shield className="w-4 h-4 text-white drop-shadow-md relative z-10" />
             </div>
-            <span className="font-display font-semibold">SecureWebOps</span>
+            <span className="font-display font-bold tracking-tight">SecureWebOps</span>
           </div>
           <div className="flex items-center gap-1">
             <Button

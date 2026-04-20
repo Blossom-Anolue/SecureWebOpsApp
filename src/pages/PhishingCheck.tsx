@@ -94,16 +94,22 @@ export default function PhishingCheck() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Phishing Checker</h1>
-          <p className="text-muted-foreground mt-1">
-            Analyze suspicious emails or links and save the result to the correct personal or company workspace.
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500/10 via-cyan-500/5 to-transparent p-6 md:p-8 border border-blue-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+          <ShieldAlert className="w-32 h-32 text-blue-600" />
+        </div>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Phishing Checker</h1>
+          <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
+            Analyze suspicious emails or links and save the result to your workspace.
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/phishing/history')}>
-          View History
-        </Button>
+        <div className="relative z-10">
+          <Button variant="outline" className="bg-white/50 backdrop-blur-sm hover:bg-white dark:bg-slate-950/50 dark:hover:bg-slate-900" onClick={() => navigate('/phishing/history')}>
+            View History
+          </Button>
+        </div>
       </div>
 
       {!result ? (

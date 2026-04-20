@@ -27,16 +27,22 @@ export default function SecureVault() {
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center gap-4 border-b pb-6 mb-6">
-        <div className="p-4 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
-          <Database className="text-primary w-8 h-8" />
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 to-slate-800 p-8 shadow-xl mb-8 border border-slate-700">
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/20 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
+        <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
+          <Lock className="w-48 h-48 text-white" />
         </div>
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">Protected Files</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Protect important files, control access, and manage shared documents in one place.
-          </p>
+        <div className="relative z-10 flex items-center gap-6">
+          <div className="p-4 bg-white/10 rounded-2xl shadow-sm border border-white/20 backdrop-blur-md hidden sm:flex">
+            <Database className="text-cyan-400 w-10 h-10" />
+          </div>
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold font-display tracking-tight text-white">Protected Files</h1>
+            <p className="text-slate-300 mt-2 text-base sm:text-lg max-w-2xl">
+              Protect important files, control access, and manage shared documents in one place.
+            </p>
+          </div>
         </div>
       </div>
 

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { UserPlus, Loader2, Download } from 'lucide-react';
+import { UserPlus, Loader2, Download, Eye, ShieldAlert, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "@/hooks/use-toast";
+import { useActivityLogger } from '@/hooks/useActivityLog';
 
 interface FileSharingProps {
   fileId: string;
@@ -28,7 +30,9 @@ function getApiErrorMessage(payload: unknown, fallback: string) {
 export default function FileSharing({ fileId, fileName, onClose }: FileSharingProps) {
   const [recipientInput, setRecipientInput] = useState('');
   const [shareExpiresAt, setShareExpiresAt] = useState('');
+  const [permissionLevel, setPermissionLevel] = useState('VIEW');
   const [isSharing, setIsSharing] = useState(false);
+  const { log } = useActivityLogger();
 
   const handleShare = async () => {
     if (!recipientInput) return;
@@ -44,7 +48,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}` 
         },
-        body: JSON.stringify({ targetUserId, level: 'DOWNLOAD', expiresAt: shareExpiresAt || null })
+        body: JSON.stringify({ targetUserId, level: permissionLevel, expiresAt: shareExpiresAt || null })
       });
 
       if (!response.ok) {
@@ -98,9 +102,16 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                For maximum security, sharing via User ID is recommended. Users can find their ID in Settings.
-              </p>
+              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2 space-y-2">
+                <p className="text-xs text-slate-600 flex items-start gap-2">
+                  <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span>For maximum security, sharing via User ID is recommended. Users can find their ID in Settings.</span>
+                </p>
+                <p className="text-xs text-slate-600 flex items-start gap-2">
+                  <Lock className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span><strong>Enterprise DLP Active:</strong> Sharing may be restricted to approved company domains. "View Only" files will be dynamically watermarked.</span>
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -120,9 +131,25 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
               <Label className="text-xs font-bold uppercase tracking-tight text-slate-500">
                 Permission Level
               </Label>
-              <div className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 bg-primary/5 border-primary text-primary font-medium">
-                <Download size={18} /> Download & Decrypt
-              </div>
+            <Select value={permissionLevel} onValueChange={setPermissionLevel}>
+              <SelectTrigger className="w-full h-12 bg-white rounded-xl border-slate-200">
+                <SelectValue placeholder="Select a permission level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VIEW">
+                  <div className="flex items-center gap-2">
+                    <Eye size={16} className="text-slate-500" />
+                    <span>View Only</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="DOWNLOAD">
+                  <div className="flex items-center gap-2">
+                    <Download size={16} className="text-slate-500" />
+                    <span>Download (Raw & Decrypt)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             </div>
           </div>
         </div>

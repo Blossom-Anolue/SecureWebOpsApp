@@ -40,3 +40,4 @@ check_*.js
 reload_schema.js
 sql_*.js
 test_*.js
+.env
