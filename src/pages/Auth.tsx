@@ -114,11 +114,10 @@ export default function Auth() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
     if (timer > 0) {
-      interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+      const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+      return () => clearInterval(interval);
     }
-    return () => clearInterval(interval);
   }, [timer]);
 
   useEffect(() => {
@@ -191,7 +190,12 @@ export default function Auth() {
     if (!normalizedEmail) return toast({ title: "Email Required", description: "Please enter your email first.", variant: "destructive" });
 
     setIsSubmitting(true);
-    const { error } = await signInWithMagicLink(normalizedEmail);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      }
+    });
     setIsSubmitting(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
@@ -207,7 +211,9 @@ export default function Auth() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const { error } = await resetPassword(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
     setIsSubmitting(false);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
@@ -320,11 +326,15 @@ export default function Auth() {
         {/* LOGO & BRANDING */}
         {/* ================================================================== */}
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary mx-auto flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="relative w-20 h-20 mx-auto mb-6 group">
+            <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full group-hover:bg-primary/30 transition-colors duration-500"></div>
+            <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-xl shadow-primary/20 border border-white/20 overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1/2 bg-white/10 rounded-b-full blur-[2px]"></div>
+              <Shield className="w-10 h-10 text-white drop-shadow-lg relative z-10" />
+            </div>
           </div>
-          <h1 className="text-2xl font-bold font-display">SecureWebOps</h1>
-          <p className="text-muted-foreground mt-1">Small Business Security Assistant</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">SecureWebOps</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">Small Business Security Assistant</p>
         </div>
 
         {/* ================================================================== */}

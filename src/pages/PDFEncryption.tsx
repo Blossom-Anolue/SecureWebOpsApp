@@ -18,6 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useActivityLogger } from '@/hooks/useActivityLog';
 
 type EncryptionResponse = {
   message?: string;
@@ -69,43 +70,66 @@ function getApiErrorMessage(payload: unknown, fallback: string) {
 
 export default function PDFEncryption() {
   const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
-  const [result, setResult] = useState<EncryptionResponse | null>(null);
+  const [results, setResults] = useState<EncryptionResponse[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const { log } = useActivityLogger();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextFile = e.target.files?.[0] || null;
-
+  const handleFiles = (newFiles: File[]) => {
     setStatus('idle');
     setMessage('');
-    setResult(null);
+    setResults([]);
 
-    if (!nextFile) {
-      setFile(null);
-      return;
+    const validFiles = newFiles.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+
+    if (validFiles.length !== newFiles.length) {
+      toast({ title: "Invalid File(s)", description: "Only PDF files can be uploaded to the secure vault.", variant: "destructive" });
     }
 
-    const isPdf = nextFile.type === 'application/pdf' || nextFile.name.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      setFile(null);
+    if (validFiles.length > 0) {
+      setFiles(prev => {
+        const existingMap = new Set(prev.map(f => `${f.name}-${f.size}`));
+        const uniqueFiles = validFiles.filter(f => !existingMap.has(`${f.name}-${f.size}`));
+        return [...prev, ...uniqueFiles];
+      });
+    } else if (newFiles.length > 0) {
       setStatus('error');
-      setMessage('Please choose a PDF file before uploading.');
-      toast({ title: "Invalid File", description: "Only PDF files can be uploaded to the secure vault.", variant: "destructive" });
-      e.target.value = '';
-      return;
+      setMessage('Please choose valid PDF file(s) before uploading.');
     }
+  };
 
-    setFile(nextFile);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFiles(Array.from(e.target.files));
+    }
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files) {
+      handleFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
 
     setStatus('uploading');
     setMessage('');
-    const formData = new FormData();
-    formData.append('pdf', file);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -115,25 +139,40 @@ export default function PDFEncryption() {
         throw new Error('Your session has expired. Please sign in again and retry the upload.');
       }
       
-      // This calls the proxy defined in vite.config.ts
-      const response = await fetch("/api/pdf/upload", {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: formData,
-      });
+      const newResults: EncryptionResponse[] = [];
+      
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('pdf', file);
 
-      const resultData = await parseApiResponse(response);
+        // This calls the proxy defined in vite.config.ts
+        const response = await fetch("/api/pdf/upload", {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
 
-      if (!response.ok) {
-        throw new Error(getApiErrorMessage(resultData, "Encryption Gateway Error"));
+        const resultData = await parseApiResponse(response);
+
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(resultData, `Encryption Gateway Error for ${file.name}`));
+        }
+
+        newResults.push(deriveMetadata(resultData));
       }
 
-      setStatus('success');
-      setResult(deriveMetadata(resultData));
+      newResults.forEach(res => {
+        log('FILE_ENCRYPTED_STORED', 'file', {
+          details: { fileName: res.originalFileName, path: res.path }
+        });
+      });
 
-      toast({ title: "Vault Secured", description: "File encrypted and stored.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      setStatus('success');
+      setResults(newResults);
+
+      toast({ title: "Vault Secured", description: `${files.length} file(s) encrypted and stored.`, className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
     } catch (error: unknown) {
       const fallbackMessage = error instanceof TypeError && error.message?.includes('expected pattern')
         ? 'Upload request could not be created. This usually means the app URL or upload filename contains invalid characters.'
@@ -142,95 +181,6 @@ export default function PDFEncryption() {
       setStatus('error');
       setMessage(fallbackMessage); 
       toast({ title: "Upload Failed", description: fallbackMessage, variant: "destructive" });
-    }
-  };
-
-  // --- DECRYPT & DOWNLOAD ---
-  const handleDownload = async (fileId: string, fileName: string, userEmail: string) => {
-    if (!session?.access_token) return;
-    setActionLoading(`download-${fileId}`);
-    try {
-      const response = await fetch(`/api/pdf/download/${fileId}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-User-Email': userEmail, // Pass the email for secure access tracking
-        },
-      });
-      
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Decryption failed.');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.download = fileName.endsWith('.enc') ? fileName.replace('.enc', '') : fileName; // Ensure original file name for download
-      document.body.appendChild(a); 
-      a.click();
-      window.URL.revokeObjectURL(url); 
-      a.remove(); 
-      toast({ title: "Success", description: "File securely decrypted and downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
-    } catch (error) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Download failed.", variant: "destructive" });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  // --- SHARE FILE ACCESS ---
-  const handleShare = async () => {
-    if (!session?.access_token || !fileToShare || !targetUserId) return;
-    setActionLoading('share');
-    try {
-      const response = await fetch(`/api/pdf/share/${fileToShare}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ targetUserId, level: 'DOWNLOAD', expiresAt: shareExpiresAt || null }),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(getApiErrorMessage(err, 'Sharing failed.'));
-      }
-      toast({ title: "Access Granted", description: `Successfully shared file with ${targetUserId}.` });
-      setShareModalOpen(false); 
-      setTargetUserId('');
-      setShareExpiresAt('');
-    } catch (error) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Sharing failed.", variant: "destructive" });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  // --- PURGE FILE ---
-  const handleDelete = async (fileId: string) => {
-    if (!session?.access_token) return;
-    if (!confirm("Are you sure you want to permanently purge this file?")) return;
-    setActionLoading(`delete-${fileId}`);
-    try {
-      const response = await fetch(`/api/pdf/${fileId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.details || err.error || 'Delete failed.');
-      }
-      const payload = await response.json().catch(() => ({}));
-      toast({ title: "File Purged", description: "File permanently deleted from storage and database." });
-      if (Array.isArray(payload.warnings) && payload.warnings.length > 0) {
-        toast({ title: "Cleanup Warnings", description: payload.warnings.join(' | '), variant: "destructive" });
-      }
-      void loadRecentFiles(); 
-    } catch (error) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Delete failed.", variant: "destructive" });
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -251,28 +201,48 @@ export default function PDFEncryption() {
           <CardContent className="space-y-6">
             <div 
               className={`relative group border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center space-y-4 transition-all duration-300 ease-in-out ${
-                file 
+                files.length > 0
                   ? 'border-primary bg-primary/5 shadow-inner' 
+                  : isDragging
+                  ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]'
                   : 'border-slate-300 hover:border-primary/50 hover:bg-primary/[0.02] bg-slate-50/50'
               }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              <div className={`absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl pointer-events-none ${file ? 'opacity-100' : ''}`} />
+              <div className={`absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl pointer-events-none ${files.length > 0 ? 'opacity-100' : ''}`} />
               
-              <div className={`p-4 rounded-full transition-transform duration-300 ${file ? 'bg-primary text-white scale-110 shadow-md' : 'bg-slate-200 text-slate-500 group-hover:scale-110 group-hover:bg-primary/20 group-hover:text-primary'}`}>
-                {file ? <FileText className="w-8 h-8" /> : <UploadCloud className="w-8 h-8" />}
+              <div className={`p-4 rounded-full transition-transform duration-300 ${files.length > 0 ? 'bg-primary text-white scale-110 shadow-md' : 'bg-slate-200 text-slate-500 group-hover:scale-110 group-hover:bg-primary/20 group-hover:text-primary'}`}>
+                {files.length > 0 ? <FileText className="w-8 h-8" /> : <UploadCloud className="w-8 h-8" />}
               </div>
               
               <div className="text-center relative z-10">
                 <p className="font-semibold text-lg text-slate-800">
-                  {file ? file.name : "Drag & Drop your PDF here"}
+                  {files.length > 0 ? `${files.length} file(s) selected` : "Drag & Drop your PDFs here"}
                 </p>
-                <p className="text-sm text-slate-500 mt-1">
-                  {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "Files are encrypted client-side before storage"}
-                </p>
+                <div className="text-sm text-slate-500 mt-2 max-w-md flex flex-wrap justify-center gap-2">
+                  {files.length > 0 
+                    ? files.map((f, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 bg-white/80 border border-slate-200 px-2 py-1 rounded-md shadow-sm">
+                          <span className="truncate max-w-[150px]">{f.name}</span>
+                          <button 
+                            type="button" 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFiles(prev => prev.filter((_, idx) => idx !== i)); }} 
+                            className="text-slate-400 hover:text-red-500 ml-1 focus:outline-none"
+                            title="Remove file"
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))
+                    : "Files are encrypted client-side before storage"}
+                </div>
               </div>
               
               <input 
                 type="file" 
+                multiple
                 accept=".pdf,application/pdf" 
                 onChange={handleFileChange}
                 className="hidden" 
@@ -281,18 +251,18 @@ export default function PDFEncryption() {
               <label 
                 htmlFor="pdf-upload" 
                 className={`relative z-10 px-6 py-2.5 rounded-full cursor-pointer font-medium transition-all shadow-sm ${
-                  file 
-                    ? 'bg-white text-primary border border-primary/20 hover:bg-slate-50' 
+                  files.length > 0 
+                    ? 'bg-white text-primary border border-primary/20 hover:bg-slate-50 mt-4 inline-block' 
                     : 'bg-white border border-slate-200 text-slate-700 hover:border-primary/30 hover:text-primary hover:shadow'
                 }`}
               >
-                {file ? 'Change File' : 'Browse Files'}
+                {files.length > 0 ? 'Add More Files' : 'Browse Files'}
               </label>
             </div>
 
             <Button
               onClick={handleUpload}
-              disabled={!file || status === 'uploading'}
+              disabled={files.length === 0 || status === 'uploading'}
               size="lg"
               className="w-full h-14 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-[#1a474a] text-white shadow-md hover:shadow-lg transition-all rounded-xl text-base font-semibold flex items-center justify-center gap-3"
             >
@@ -316,7 +286,7 @@ export default function PDFEncryption() {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => {setStatus('idle'); setFile(null); setResult(null);}}
+                  onClick={() => {setStatus('idle'); setFiles([]); setResults([]);}}
                   className="text-red-700 hover:text-red-800 hover:bg-red-100/50"
                 >
                   Clear & Try Again
@@ -328,34 +298,38 @@ export default function PDFEncryption() {
 
         {/* Status / Result Section */}
         <div className="lg:col-span-5 space-y-6">
-          {status === 'success' && result ? (
-            <Card className="bg-emerald-50/80 border-emerald-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-emerald-800 flex items-center gap-2 text-lg">
-                  <CheckCircle className="text-emerald-600 w-5 h-5" />
-                  Encryption Verified
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-emerald-900/80">
-                <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
-                  <span className="font-medium">Original File</span>
-                  <span className="truncate pl-4">{result.originalFileName}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
-                  <span className="font-medium">Vault Path</span>
-                  <span className="truncate pl-4 font-mono text-xs">{result.path}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
-                  <span className="font-medium">Cipher</span>
-                  <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">AES-256-GCM</Badge>
-                </div>
-                <div className="pt-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100/50 text-emerald-700 text-[10px] uppercase font-mono tracking-wider font-semibold border border-emerald-200/50">
-                    <CheckCircle className="w-3 h-3" /> MD5_HASH_VERIFIED: SUCCESS
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+          {status === 'success' && results.length > 0 ? (
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+              {results.map((res, index) => (
+                <Card key={index} className="bg-emerald-50/80 border-emerald-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-emerald-800 flex items-center gap-2 text-lg">
+                      <CheckCircle className="text-emerald-600 w-5 h-5" />
+                      Encryption Verified
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm text-emerald-900/80">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                      <span className="font-medium">Original File</span>
+                      <span className="truncate pl-4">{res.originalFileName}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                      <span className="font-medium">Vault Path</span>
+                      <span className="truncate pl-4 font-mono text-xs">{res.path}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                      <span className="font-medium">Cipher</span>
+                      <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">AES-256-GCM</Badge>
+                    </div>
+                    <div className="pt-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100/50 text-emerald-700 text-[10px] uppercase font-mono tracking-wider font-semibold border border-emerald-200/50">
+                        <CheckCircle className="w-3 h-3" /> MD5_HASH_VERIFIED: SUCCESS
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ) : null}
           
           <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl border-slate-700 relative overflow-hidden min-h-[220px]">

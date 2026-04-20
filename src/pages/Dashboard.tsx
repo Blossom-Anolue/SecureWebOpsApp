@@ -22,7 +22,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Puzzle, Download, ExternalLink, Lock, FileUp, Settings as SettingsIcon, Globe } from 'lucide-react';
+import { Shield, Mail, Puzzle, Download, ExternalLink, Lock, FileUp, Settings as SettingsIcon, Globe, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,11 +88,11 @@ export default function Dashboard() {
 
       const fileIds = new Set<string>();
 
-      for (const file of ownedResult.data || []) {
+      for (const file of (ownedResult.data as any[]) || []) {
         if (file?.id) fileIds.add(file.id);
       }
 
-      for (const permission of sharedResult.data || []) {
+      for (const permission of (sharedResult.data as any[]) || []) {
         if (permission?.file_id) fileIds.add(permission.file_id);
       }
 
@@ -229,54 +229,75 @@ export default function Dashboard() {
             <CardTitle className="text-lg">Quick Summary</CardTitle>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-3 gap-3">
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Domains</p>
-              <p className="mt-1 text-2xl font-semibold">{domains.length}</p>
+            <div className="rounded-xl border bg-blue-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-blue-200">
+              <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                <Globe className="w-24 h-24 text-blue-600" />
+              </div>
+              <div className="flex items-center gap-2 mb-2 relative z-10">
+                <Globe className="w-4 h-4 text-blue-600" />
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-800">Monitored Domains</p>
+              </div>
+              <p className="text-3xl font-bold text-slate-900 relative z-10">{domains.length}</p>
             </div>
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed Scans</p>
-              <p className="mt-1 text-2xl font-semibold">{completedScans.length}</p>
+            <div className="rounded-xl border bg-emerald-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-emerald-200">
+              <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                <ShieldCheck className="w-24 h-24 text-emerald-600" />
+              </div>
+              <div className="flex items-center gap-2 mb-2 relative z-10">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Completed Scans</p>
+              </div>
+              <p className="text-3xl font-bold text-slate-900 relative z-10">{completedScans.length}</p>
             </div>
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vault Files</p>
-              <p className="mt-1 text-2xl font-semibold">{vaultFileCount}</p>
+            <div className="rounded-xl border bg-purple-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-purple-200">
+              <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                <Lock className="w-24 h-24 text-purple-600" />
+              </div>
+              <div className="flex items-center gap-2 mb-2 relative z-10">
+                <Lock className="w-4 h-4 text-purple-600" />
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-800">Secured Files</p>
+              </div>
+              <p className="text-3xl font-bold text-slate-900 relative z-10">{vaultFileCount}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="rounded-xl border bg-card shadow-card p-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Puzzle className="h-5 w-5" />
+      <div className="rounded-xl border bg-gradient-to-r from-slate-900 to-slate-800 shadow-card p-6 md:p-8 relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/20 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
+        <div className="flex items-start gap-5 relative z-10">
+          <div className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary-foreground backdrop-blur-sm border border-primary/30">
+            <Puzzle className="h-6 w-6 text-cyan-400" />
           </div>
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">Install The Browser Extension</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h2 className="text-xl font-bold text-white">Install The Browser Extension</h2>
+              <p className="text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
                 Add the SecureWebOps Scanner extension to test quick website scans and Gmail or Outlook phishing checks.
               </p>
             </div>
-            <div className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
-              <p>How to test it:</p>
+            <div className="rounded-lg bg-slate-950/50 border border-slate-700 p-4 text-sm text-slate-300 font-mono">
+              <p className="text-cyan-400 font-sans font-bold mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                <SettingsIcon className="w-3 h-3" /> Installation Guide:
+              </p>
               <p>1. Download the zip below and extract it.</p>
               <p>2. Open `chrome://extensions` or `edge://extensions`.</p>
               <p>3. Turn on Developer mode and choose Load unpacked.</p>
               <p>4. Select the extracted `extension` folder, then sign in from the popup.</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 pt-2">
               <a
                 href={extensionDownloadUrl}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+                className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-900 transition-all shadow-lg hover:shadow-cyan-500/25"
               >
-                <Download className="h-4 w-4" />
+                <Download className="h-4 w-4" strokeWidth={2.5} />
                 Download Extension
               </a>
               <button
                 onClick={() => navigate('/phishing/check')}
-                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-slate-700 hover:border-slate-500"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-4 w-4" strokeWidth={2.5} />
                 Test Phishing Page
               </button>
             </div>

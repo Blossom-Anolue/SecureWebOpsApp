@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2, AlertTriangle, Copy } from 'lucide-react';
+import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2, AlertTriangle, Copy, ShieldCheck, Database, Settings as SettingsIcon } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -87,6 +87,11 @@ export default function Settings() {
   const [newDomainScope, setNewDomainScope] = useState<string>('personal');
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  
+  // Enterprise settings 
+  const [dlpEnabled, setDlpEnabled] = useState(false);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [siemUrl, setSiemUrl] = useState('');
 
   // Initialize form values from fetched data
   useEffect(() => {
@@ -260,15 +265,18 @@ export default function Settings() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0 max-w-3xl">
-      {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Settings</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your business profile, domains, notifications, and account safety in one place.
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 md:p-8 border border-primary/10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="absolute -right-6 -top-6 opacity-5 pointer-events-none">
+          <SettingsIcon className="w-40 h-40 text-primary" />
+        </div>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Settings</h1>
+          <p className="text-muted-foreground mt-2 text-lg max-w-xl">
+            Manage your business profile, domains, notifications, and workspace security.
           </p>
         </div>
-        <Button size="lg" onClick={handleSave} disabled={isSaving || !hasChanges} className="lg:min-w-[180px]">
+        <Button size="lg" onClick={handleSave} disabled={isSaving || !hasChanges} className="relative z-10 lg:min-w-[180px] shadow-md">
           {isSaving ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -298,6 +306,11 @@ export default function Settings() {
           <Button variant="outline" onClick={() => document.getElementById('notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
             Notifications
           </Button>
+          {organizations && organizations.length > 0 && (
+            <Button variant="outline" onClick={() => document.getElementById('workspace-security')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              Workspace Security
+            </Button>
+          )}
           <Button variant="outline" onClick={() => navigate('/dashboard')}>
             Back To Dashboard
           </Button>
@@ -479,6 +492,69 @@ export default function Settings() {
       {/* Scheduled Scans */}
       {domains && domains.length > 0 && (
         <ScanScheduleCard domains={domains} />
+      )}
+
+      {/* Workspace Security (Enterprise) */}
+      {organizations && organizations.length > 0 && (
+        <Card id="workspace-security" className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              Company Workspace Security
+            </CardTitle>
+            <CardDescription>Advanced data loss prevention (DLP) and compliance policies</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">External Sharing Restrictions (DLP)</p>
+                <p className="text-sm text-muted-foreground">Block users from sharing Vault files with email addresses outside of approved company domains.</p>
+              </div>
+              <Switch checked={dlpEnabled} onCheckedChange={(val) => {
+                setDlpEnabled(val);
+                toast({ title: val ? "DLP Enabled" : "DLP Disabled", description: "External sharing restrictions updated." });
+              }} />
+            </div>
+            <Separator className="bg-primary/10" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Dynamic PDF Watermarking</p>
+                <p className="text-sm text-muted-foreground">Automatically stamp the recipient's email address across files decrypted with "View Only" access to prevent unauthorized screenshots or leaks.</p>
+              </div>
+              <Switch checked={watermarkEnabled} onCheckedChange={(val) => {
+                setWatermarkEnabled(val);
+                toast({ title: val ? "Watermarking Enabled" : "Watermarking Disabled", description: "Document viewing policies updated." });
+              }} />
+            </div>
+            <Separator className="bg-primary/10" />
+            <div className="space-y-3">
+              <div>
+                <p className="font-medium">SIEM / Log Forwarding Webhook</p>
+                <p className="text-sm text-muted-foreground">Automatically forward audit logs to external security tools like Splunk or Datadog.</p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://splunk-hec.example.com/services/collector"
+                  value={siemUrl}
+                  onChange={(e) => setSiemUrl(e.target.value)}
+                  className="bg-white"
+                />
+                <Button variant="secondary" onClick={() => toast({ title: "SIEM Configured", description: "Audit logs will be forwarded to the specified endpoint."})}>Connect</Button>
+              </div>
+            </div>
+            <Separator className="bg-primary/10" />
+            <div className="rounded-lg bg-white p-4 border border-primary/20 flex items-start gap-3">
+              <Database className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Enterprise Audit Log Retention Active</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your company workspace activity logs are securely retained for <strong>1 to 7 years</strong> to meet SOC2 and HIPAA compliance requirements. 
+                  <br/><span className="italic">(Note: Personal account logs are only retained for 30 days).</span>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Notifications */}

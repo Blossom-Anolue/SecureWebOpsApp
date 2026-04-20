@@ -296,7 +296,7 @@ const MASTER_SECRET = process.env.KMS_MASTER_SECRET;
 const GCM_IV_LENGTH = 12;
 const GCM_AUTH_TAG_LENGTH = 16;
 const MAX_SHARE_LIFETIME_DAYS = Number.parseInt(process.env.PDF_SHARE_MAX_DAYS || '30', 10);
-const PDF_HARDENED_SCHEMA = false;
+const PDF_HARDENED_SCHEMA = true;
 
 async function ensureBucketExists(bucketName) {
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
@@ -441,6 +441,16 @@ async function resolveShareRecipient(targetUserId, requester = null) {
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipient);
     if (isUUID) {
+        const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, username')
+            .eq('id', recipient)
+            .maybeSingle();
+
+        if (profileData) {
+            return { userId: profileData.id, profile: profileData };
+        }
+
         const { data, error } = await supabaseAdmin.auth.admin.getUserById(recipient);
         if (error || !data?.user) {
             return { error: { status: 404, message: "User not found with that User ID." } };
@@ -450,14 +460,15 @@ async function resolveShareRecipient(targetUserId, requester = null) {
             userId: data.user.id,
             profile: {
                 email: data.user.email || null,
-                full_name: null
+                full_name: null,
+                username: null
             }
         };
     }
 
     const { data: userProfile, error: profileErr } = await supabase
         .from('profiles')
-        .select('id, email, full_name')
+        .select('id, email, full_name, username')
         .ilike('email', recipient)
         .maybeSingle();
 
@@ -484,13 +495,13 @@ async function resolveShareRecipient(targetUserId, requester = null) {
     };
 }
 
-function formatAccessibleFile(record, permissionLevel, owned = false) {
+function formatAccessibleFile(record, permissionLevel, owned = false, sharedAt = null) {
     return {
         id: record.id,
         name: record.original_file_name || record.encrypted_file_name || 'Untitled Document',
         originalFileName: record.original_file_name,
         path: record.storage_path || '',
-        createdAt: record.created_at || null,
+        createdAt: sharedAt || record.created_at || null,
         mimeType: record.mime_type || 'application/pdf',
         keyLabel: record.key_label || null,
         organizationId: record.organization_id || null,
@@ -513,10 +524,17 @@ async function fetchAccessiblePdfRecords(userId, limit = 50) {
         .from('file_permissions')
         .select(PDF_HARDENED_SCHEMA
             ? 'file_id, permission_level, created_at, expires_at, revoked_at'
-            : 'file_id, permission_level, created_at')
+            : 'file_id, permission_level, created_at, expires_at')
         .eq('user_id', userId);
 
     if (PDF_HARDENED_SCHEMA && permissionError && isMissingColumnError(permissionError, ['expires_at', 'revoked_at'])) {
+        ({ data: permissionRows, error: permissionError } = await supabase
+            .from('file_permissions')
+            .select('file_id, permission_level, created_at, expires_at')
+            .eq('user_id', userId));
+    }
+
+    if (permissionError && isMissingColumnError(permissionError, ['expires_at'])) {
         ({ data: permissionRows, error: permissionError } = await supabase
             .from('file_permissions')
             .select('file_id, permission_level, created_at')
@@ -542,13 +560,16 @@ async function fetchAccessiblePdfRecords(userId, limit = 50) {
         sharedFiles = data || [];
     }
 
-    const sharedPermissionByFileId = new Map(
-        (permissionRows || []).map((row) => [row.file_id, row.permission_level])
+    const sharedDataByFileId = new Map(
+        (permissionRows || []).map((row) => [row.file_id, { level: row.permission_level, sharedAt: row.created_at }])
     );
 
     return [
         ...(ownedFiles || []).map((file) => formatAccessibleFile(file, 'ADMIN', true)),
-        ...sharedFiles.map((file) => formatAccessibleFile(file, sharedPermissionByFileId.get(file.id) || 'VIEW', false))
+        ...sharedFiles.map((file) => {
+            const shareData = sharedDataByFileId.get(file.id) || { level: 'VIEW', sharedAt: null };
+            return formatAccessibleFile(file, shareData.level, false, shareData.sharedAt);
+        })
     ]
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, limit);
@@ -570,12 +591,21 @@ const checkPermission = (requiredLevel) => async (req, res, next) => {
             .from('file_permissions')
             .select(PDF_HARDENED_SCHEMA
                 ? 'permission_level, expires_at, revoked_at'
-                : 'permission_level')
+                : 'permission_level, expires_at')
             .eq('file_id', fileId)
             .eq('user_id', userId)
             .maybeSingle();
 
         if (PDF_HARDENED_SCHEMA && permissionError && isMissingColumnError(permissionError, ['expires_at', 'revoked_at'])) {
+            ({ data: permissionEntry, error: permissionError } = await supabase
+                .from('file_permissions')
+                .select('permission_level, expires_at')
+                .eq('file_id', fileId)
+                .eq('user_id', userId)
+                .maybeSingle());
+        }
+
+        if (permissionError && isMissingColumnError(permissionError, ['expires_at'])) {
             ({ data: permissionEntry, error: permissionError } = await supabase
                 .from('file_permissions')
                 .select('permission_level')
@@ -770,7 +800,7 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
 });
 
 // --- DOWNLOAD & DECRYPT ---
-router.get('/download/:fileId', checkPermission('DOWNLOAD'), async (req, res) => {
+router.get('/download/:fileId', checkPermission('VIEW'), async (req, res) => {
     const { fileId } = req.params;
     const userId = req.user?.id;
 
@@ -793,6 +823,60 @@ router.get('/download/:fileId', checkPermission('DOWNLOAD'), async (req, res) =>
               ? 404
               : 500;
         res.status(status).json({ error: message || "Decryption failed." });
+    }
+});
+
+// --- DOWNLOAD RAW ENCRYPTED ---
+router.get('/raw/:fileId', checkPermission('DOWNLOAD'), async (req, res) => {
+    const { fileId } = req.params;
+    const userId = req.user?.id;
+
+    try {
+        const file = await fetchEncryptedPdfRecord(fileId);
+        if (!file) {
+            return res.status(404).json({ error: "File not found." });
+        }
+
+        const bucketName = file.storage_bucket || STORAGE_BUCKET;
+        const { data: blob, error } = await supabase.storage
+            .from(bucketName)
+            .download(file.storage_path);
+
+        if (error) {
+            throw new Error(`Failed to download encrypted file from storage: ${error.message}`);
+        }
+
+        const buffer = Buffer.from(await blob.arrayBuffer());
+
+        try {
+            await logEvent({ 
+                action: 'FILE_DOWNLOAD_RAW', 
+                user: userId, 
+                status: 'SUCCESS', 
+                fileId: fileId,
+                fileName: file.original_file_name || file.encrypted_file_name || 'encrypted_file',
+                ip: req.ip,
+                details: 'Downloaded raw encrypted file'
+            });
+        } catch (logErr) {
+            console.warn("[AUDIT LOG WARNING] Could not log FILE_DOWNLOAD_RAW (likely DB enum constraint):", logErr.message);
+            await logEvent({ 
+                action: 'FILE_DECRYPT_SUCCESS', 
+                user: userId, 
+                status: 'SUCCESS', 
+                fileId: fileId,
+                fileName: file.original_file_name || file.encrypted_file_name || 'encrypted_file',
+                ip: req.ip,
+                details: '[RAW] Downloaded raw encrypted file directly'
+            }).catch(() => {});
+        }
+
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${sanitizeStorageSegment(file.encrypted_file_name || file.original_file_name + '.enc')}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error("Raw Download Error:", error);
+        res.status(500).json({ error: "Failed to download raw file." });
     }
 });
 
@@ -838,7 +922,8 @@ router.post('/share/:fileId', checkPermission('ADMIN'), async (req, res) => {
             file_id: fileId, 
             user_id: recipient.userId, 
             permission_level: normalizedLevel,
-            granted_by: adminId
+            granted_by: adminId,
+            expires_at: shareExpiresAt
         };
 
         let { error } = await supabase
@@ -846,7 +931,6 @@ router.post('/share/:fileId', checkPermission('ADMIN'), async (req, res) => {
             .upsert([PDF_HARDENED_SCHEMA
                 ? {
                     ...sharePayload,
-                    expires_at: shareExpiresAt,
                     revoked_at: null,
                     revoked_by: null,
                     revoke_reason: null
@@ -854,13 +938,23 @@ router.post('/share/:fileId', checkPermission('ADMIN'), async (req, res) => {
                 : sharePayload
             ], { onConflict: 'file_id,user_id' });
 
-        if (PDF_HARDENED_SCHEMA && error && isMissingColumnError(error, ['expires_at', 'revoked_at', 'revoked_by', 'revoke_reason'])) {
+        if (PDF_HARDENED_SCHEMA && error && isMissingColumnError(error, ['revoked_at', 'revoked_by', 'revoke_reason'])) {
             ({ error } = await supabase
                 .from('file_permissions')
                 .upsert([sharePayload], { onConflict: 'file_id,user_id' }));
         }
 
+        if (error && isMissingColumnError(error, ['expires_at'])) {
+            const { expires_at, ...basicPayload } = sharePayload;
+            ({ error } = await supabase
+                .from('file_permissions')
+                .upsert([basicPayload], { onConflict: 'file_id,user_id' }));
+        }
+
         if (error) throw error;
+
+        const recipientDisplay = recipient.profile?.username || recipient.profile?.email || recipient.profile?.full_name || recipient.userId;
+        const recipientInfo = recipientDisplay === recipient.userId ? recipient.userId : `${recipientDisplay} (ID: ${recipient.userId})`;
 
         // Log the access grant event
         await logEvent({ 
@@ -869,7 +963,7 @@ router.post('/share/:fileId', checkPermission('ADMIN'), async (req, res) => {
             status: 'SUCCESS', 
             fileId: fileId,
             ip: req.ip,
-            details: `Granted ${normalizedLevel} to ${recipient.userId}${shareExpiresAt ? ` until ${shareExpiresAt}` : ''}` 
+            details: `Granted ${normalizedLevel} to ${recipientInfo}${shareExpiresAt ? ` until ${shareExpiresAt}` : ''}` 
         });
 
         // --- EMAIL NOTIFICATION LOGIC ---
@@ -977,13 +1071,16 @@ router.post('/share/:fileId/revoke', checkPermission('ADMIN'), async (req, res) 
             return res.status(404).json({ error: "Active share not found for that user." });
         }
 
+        const recipientDisplay = recipient.profile?.username || recipient.profile?.email || recipient.profile?.full_name || recipient.userId;
+        const recipientInfo = recipientDisplay === recipient.userId ? recipient.userId : `${recipientDisplay} (ID: ${recipient.userId})`;
+
         await logEvent({
             action: 'ACCESS_REVOKED',
             user: adminId,
             status: 'SUCCESS',
             fileId,
             ip: req.ip,
-            details: `Revoked access for ${recipient.userId}: ${revokeReason}`
+            details: `Revoked access for ${recipientInfo}: ${revokeReason}`
         });
 
         res.json({ message: 'Access revoked successfully.' });

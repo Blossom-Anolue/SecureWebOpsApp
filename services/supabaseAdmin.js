@@ -9,4 +9,22 @@ if (!supabaseUrl || !supabaseServiceKey) {
   );
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const cleanedKey = supabaseServiceKey.trim().replace(/^["']|["']$/g, '');
+
+if (cleanedKey.endsWith('>')) {
+  throw new Error(
+    '\n\n❌ CRITICAL ERROR: Your SUPABASE_SERVICE_KEY in the .env file is truncated/broken!\n' +
+    'It ends with a ">" character, which means it was cut off when you copied it from your terminal or browser.\n' +
+    'Please open your .env file, delete the broken key, and paste the FULL service_role secret key from your Supabase Dashboard -> Project Settings -> API.\n' +
+    'Restart the server after saving.\n\n'
+  );
+}
+
+if (cleanedKey.split('.').length !== 3) {
+  console.warn(
+    '\n\n⚠️ WARNING: Your SUPABASE_SERVICE_KEY does not look like a complete JWT (it should have 3 parts separated by dots).\n' +
+    'If you get "Invalid API key" or "Invalid or expired bearer token" errors, your key is likely incomplete.\n\n'
+  );
+}
+
+export const supabaseAdmin = createClient(supabaseUrl, cleanedKey);

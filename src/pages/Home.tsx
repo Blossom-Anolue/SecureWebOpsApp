@@ -109,11 +109,12 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo and brand name */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Shield className="w-5 h-5 text-primary-foreground" />
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-lg shadow-primary/20 border border-white/20 relative overflow-hidden">
+              <div className="absolute inset-0 bg-white/10 w-full h-full transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"></div>
+              <Shield className="w-5 h-5 text-white drop-shadow-md" />
             </div>
-            <span className="text-xl font-bold">SecureWebOps</span>
+            <span className="text-xl font-bold tracking-tight">SecureWebOps</span>
           </Link>
           
           {/* Navigation actions */}
@@ -135,6 +136,10 @@ export default function Home() {
       <section className="relative overflow-hidden">
         {/* Background gradient for visual interest */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-[30%] -right-[10%] w-[70vw] h-[70vw] rounded-full bg-primary/5 blur-3xl" />
+          <div className="absolute -bottom-[30%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-500/5 blur-3xl" />
+        </div>
         <div className="container mx-auto px-4 py-24 md:py-32 relative">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             {/* Badge/tagline */}
@@ -321,11 +326,11 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Shield className="w-4 h-4 text-primary-foreground" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-cyan-600 flex items-center justify-center shadow-md border border-white/10">
+                <Shield className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold">SecureWebOps</span>
+              <span className="font-semibold tracking-tight">SecureWebOps</span>
             </div>
             {/* Copyright */}
             <div className="text-center md:text-right space-y-3">

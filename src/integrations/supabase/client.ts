@@ -4,6 +4,24 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const authLockQueue = new Map<string, Promise<unknown>>();
+
+async function appLocalAuthLock<R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
+  const name = _name || 'supabase-auth';
+  const previous = authLockQueue.get(name) ?? Promise.resolve();
+
+  const current = previous
+    .catch(() => undefined)
+    .then(fn)
+    .finally(() => {
+      if (authLockQueue.get(name) === current) {
+        authLockQueue.delete(name);
+      }
+    });
+
+  authLockQueue.set(name, current);
+  return current;
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -13,5 +31,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: window.sessionStorage,
     persistSession: true,
     autoRefreshToken: true,
+    lock: appLocalAuthLock,
   }
 });

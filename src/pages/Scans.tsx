@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Shield, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Shield, Clock, CheckCircle2, XCircle, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,10 +33,13 @@ export default function Scans() {
   if (!domains || domains.length === 0) {
     return (
       <div className="space-y-6 pb-20 lg:pb-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold font-display">Website Scans</h1>
-            <p className="text-muted-foreground mt-1">Check your website for security vulnerabilities</p>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-transparent p-6 md:p-8 border border-violet-500/10">
+          <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+            <Search className="w-32 h-32 text-violet-600" />
+          </div>
+          <div className="relative z-10">
+            <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Website Scans</h1>
+            <p className="text-muted-foreground mt-2 text-lg">Check your website for security vulnerabilities.</p>
           </div>
         </div>
         <EmptyState
@@ -53,10 +56,19 @@ export default function Scans() {
   if (!scans || scans.length === 0) {
     return (
       <div className="space-y-6 pb-20 lg:pb-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold font-display">Website Scans</h1>
-            <p className="text-muted-foreground mt-1">Check your website for security vulnerabilities</p>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-transparent p-6 md:p-8 border border-violet-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+            <Search className="w-32 h-32 text-violet-600" />
+          </div>
+          <div className="relative z-10">
+            <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Website Scans</h1>
+            <p className="text-muted-foreground mt-2 text-lg">Check your website for security vulnerabilities.</p>
+          </div>
+          <div className="relative z-10">
+            <Button className="shadow-md" onClick={() => navigate('/scans/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Run New Scan
+            </Button>
           </div>
         </div>
         <EmptyState
@@ -73,15 +85,20 @@ export default function Scans() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold font-display">Website Scans</h1>
-          <p className="text-muted-foreground mt-1">Check your website for security vulnerabilities</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-transparent p-6 md:p-8 border border-violet-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+          <Search className="w-32 h-32 text-violet-600" />
         </div>
-        <Button onClick={() => navigate('/scans/new')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Run New Scan
-        </Button>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Website Scans</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Check your website for security vulnerabilities.</p>
+        </div>
+        <div className="relative z-10">
+          <Button className="shadow-md" onClick={() => navigate('/scans/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Run New Scan
+          </Button>
+        </div>
       </div>
 
       {/* Scan List */}

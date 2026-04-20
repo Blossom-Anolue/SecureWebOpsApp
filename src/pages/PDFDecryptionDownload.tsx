@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useActivityLogger } from '@/hooks/useActivityLog';
 
 export default function PDFDecryptionDownload() {
     const { session, user } = useAuth();
@@ -20,6 +21,7 @@ export default function PDFDecryptionDownload() {
     const [decryptFile, setDecryptFile] = useState<{id: string, name: string} | null>(null);
     const [decryptEmail, setDecryptEmail] = useState('');
     const { toast } = useToast();
+    const { log } = useActivityLogger();
     const navigate = useNavigate();
     const adminFiles = files.filter((item) => item.permission_level === 'ADMIN' && item.file?.id);
     const ownedFiles = files.filter((item) => item.owned);
@@ -59,12 +61,15 @@ export default function PDFDecryptionDownload() {
         }
     }, [session?.access_token, user?.id, toast]); 
 
-    const handleDownload = async (id: string, name: string) => {
+    const handleDownload = async (id: string, name: string, emailStr?: string) => {
         toast({ title: "Unlocking File", description: "Requesting decryption keys..." });
         try {
             const { data: { session } } = await supabase.auth.getSession();
             const res = await fetch(`/api/pdf/download/${id}`, {
-                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+                headers: { 
+                  'Authorization': `Bearer ${session?.access_token}`,
+                  'X-User-Email': emailStr || ''
+                }
             });
             
             if (!res.ok) {
@@ -82,9 +87,51 @@ export default function PDFDecryptionDownload() {
             window.URL.revokeObjectURL(url);
             a.remove();
             
+            log('FILE_DECRYPT_SUCCESS', 'file', {
+                resourceId: id,
+                details: { fileName: name, email: emailStr }
+            });
             toast({ title: "Success", description: "File securely decrypted and downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
         } catch (err: any) {
+            log('FILE_DECRYPT_FAILURE', 'file', {
+                resourceId: id,
+                details: { fileName: name, error: err.message, email: emailStr }
+            });
             toast({ title: "Decryption Failed", description: err.message, variant: "destructive" });
+        }
+    };
+
+    const handleDownloadRaw = async (id: string, name: string) => {
+        toast({ title: "Downloading", description: "Fetching encrypted file..." });
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`/api/pdf/raw/${id}`, {
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Download failed");
+            }
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name.endsWith('.enc') ? name : `${name}.enc`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+            
+            log('FILE_DOWNLOAD_RAW' as any, 'file', {
+                resourceId: id,
+                details: { fileName: name }
+            });
+            toast({ title: "Success", description: "Raw encrypted file downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+        } catch (err: any) {
+            log('FILE_DOWNLOAD_RAW_FAILURE' as any, 'file', { resourceId: id, details: { fileName: name, error: err.message } });
+            toast({ title: "Download Failed", description: err.message, variant: "destructive" });
         }
     };
 
@@ -105,6 +152,11 @@ export default function PDFDecryptionDownload() {
             }
 
             const payload = await res.json().catch(() => ({}));
+
+            log('FILE_PURGED', 'file', {
+                resourceId: fileId,
+                details: { fileName }
+            });
 
             toast({ 
                 title: "File Purged", 
@@ -169,6 +221,10 @@ export default function PDFDecryptionDownload() {
                 return;
             }
 
+            log('FILE_PURGED', 'file', {
+                details: { fileName: 'All Owned Files', count: adminFiles.length }
+            });
+
             toast({
                 title: "Vault Cleared",
                 description: "All owned encrypted files were removed from the vault.",
@@ -218,6 +274,7 @@ export default function PDFDecryptionDownload() {
                                         {item.permission_level}
                                     </span>
                                     <span className="text-xs text-slate-400">
+                                        {item.owned ? 'Encrypted on ' : 'Shared on '}
                                         {new Date(item.file?.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 </div>
@@ -226,14 +283,26 @@ export default function PDFDecryptionDownload() {
 
                         <div className="flex gap-2">
                             {(item.permission_level === 'VIEW' || item.permission_level === 'DOWNLOAD' || item.permission_level === 'ADMIN') && (
-                                <button 
-                                    onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name})} 
-                                    className="p-2 hover:bg-slate-100 rounded-lg text-primary transition-colors"
-                                    title="Decryption"
-                                >
-                                    <Download size={20}/>
-                                    <span className="sr-only">Decryption</span>
-                                </button>
+                                <>
+                                    <button 
+                                        onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name})} 
+                                        className="p-2 hover:bg-slate-100 rounded-lg text-primary transition-colors"
+                                        title="Decrypt & Download"
+                                    >
+                                        <Download size={20}/>
+                                        <span className="sr-only">Decrypt & Download</span>
+                                    </button>
+                                    {(item.permission_level === 'DOWNLOAD' || item.permission_level === 'ADMIN') && (
+                                    <button 
+                                        onClick={() => handleDownloadRaw(item.file.id, item.file.file_name)} 
+                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+                                        title="Download Raw Encrypted File"
+                                    >
+                                        <Lock size={20}/>
+                                        <span className="sr-only">Download Raw Encrypted File</span>
+                                    </button>
+                                    )}
+                                </>
                             )}
                             {item.permission_level === 'ADMIN' && (
                                 <>
@@ -372,7 +441,15 @@ export default function PDFDecryptionDownload() {
                         <Button 
                             onClick={() => {
                                 if (decryptEmail) {
-                                    handleDownload(decryptFile!.id, decryptFile!.name);
+                                    if (user?.email && decryptEmail.toLowerCase() !== user.email.toLowerCase()) {
+                                        toast({
+                                            title: "Verification Failed",
+                                            description: "The email address entered does not match your account's registered email.",
+                                            variant: "destructive"
+                                        });
+                                        return;
+                                    }
+                                    handleDownload(decryptFile!.id, decryptFile!.name, decryptEmail);
                                     setDecryptFile(null);
                                     setDecryptEmail('');
                                 }

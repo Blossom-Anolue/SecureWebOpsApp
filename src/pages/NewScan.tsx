@@ -117,11 +117,16 @@ export default function NewScan() {
       </Button>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold font-display">Start New Scan</h1>
-        <p className="text-muted-foreground mt-1">
-          Check your website for security vulnerabilities
-        </p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-transparent p-6 md:p-8 border border-violet-500/10 mb-6">
+        <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+          <Search className="w-32 h-32 text-violet-600" />
+        </div>
+        <div className="relative z-10">
+          <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Start New Scan</h1>
+          <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
+            Check your website for security vulnerabilities.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
