@@ -360,7 +360,7 @@ export default function Settings() {
           </div>
           <div className="pt-4 space-y-2 border-t mt-4">
             <p className="text-sm text-muted-foreground">
-              Signed in as: <span className="font-medium text-foreground">{user?.email}</span>
+              Signed in as: <span className="font-medium text-slate-900 dark:text-slate-100">{user?.email}</span>
             </p>
             <div className="flex items-center gap-2">
               <p className="text-sm text-muted-foreground flex items-center">
@@ -537,13 +537,13 @@ export default function Settings() {
                   placeholder="https://splunk-hec.example.com/services/collector"
                   value={siemUrl}
                   onChange={(e) => setSiemUrl(e.target.value)}
-                  className="bg-white"
+                  className="bg-white dark:bg-slate-950"
                 />
                 <Button variant="secondary" onClick={() => toast({ title: "SIEM Configured", description: "Audit logs will be forwarded to the specified endpoint."})}>Connect</Button>
               </div>
             </div>
             <Separator className="bg-primary/10" />
-            <div className="rounded-lg bg-white p-4 border border-primary/20 flex items-start gap-3">
+            <div className="rounded-lg bg-white dark:bg-slate-900 p-4 border border-primary/20 flex items-start gap-3">
               <Database className="w-5 h-5 text-primary mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-sm">Enterprise Audit Log Retention Active</p>

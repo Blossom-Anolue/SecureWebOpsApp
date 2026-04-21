@@ -80,11 +80,11 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
         <div className="p-6 space-y-6">
           {/* Header */}
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100">
               <UserPlus className="text-primary" size={22} /> Share Document
             </DialogTitle>
-            <DialogDescription className="text-sm mt-1 truncate">
-              Managing: <span className="font-medium text-slate-700">{fileName}</span>
+            <DialogDescription className="text-sm mt-1 truncate dark:text-slate-400">
+              Managing: <span className="font-medium text-slate-700 dark:text-slate-200">{fileName}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -102,12 +102,12 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
               />
-              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2 space-y-2">
-                <p className="text-xs text-slate-600 flex items-start gap-2">
+              <div className="bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-lg p-3 mt-2 space-y-2">
+                <p className="text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
                   <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
                   <span>For maximum security, carefully verify the recipient's Email or Username before sharing.</span>
                 </p>
-                <p className="text-xs text-slate-600 flex items-start gap-2">
+                <p className="text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
                   <Lock className="w-4 h-4 text-blue-500 shrink-0" />
                   <span><strong>Enterprise DLP Active:</strong> Sharing may be restricted to approved company domains. "View Only" files will be dynamically watermarked.</span>
                 </p>
@@ -132,7 +132,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
                 Permission Level
               </Label>
             <Select value={permissionLevel} onValueChange={setPermissionLevel}>
-              <SelectTrigger className="w-full h-12 bg-white rounded-xl border-slate-200">
+              <SelectTrigger className="w-full h-12 bg-white dark:bg-slate-950 rounded-xl border-slate-200 dark:border-slate-800">
                 <SelectValue placeholder="Select a permission level" />
               </SelectTrigger>
               <SelectContent>
@@ -155,7 +155,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
         </div>
 
         {/* Action Footer */}
-        <div className="bg-slate-50 p-4 flex justify-end gap-3 border-t">
+        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 flex justify-end gap-3 border-t dark:border-slate-800">
           <Button variant="outline" onClick={onClose} disabled={isSharing}>
             Cancel
           </Button>

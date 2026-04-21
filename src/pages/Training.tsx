@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, PlayCircle, CheckCircle2, Clock, Users, Mail, Calendar, X, ChevronRight, ChevronLeft, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { GraduationCap, PlayCircle, CheckCircle2, Clock, X, ChevronRight, ChevronLeft, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { mockSimulations } from '@/lib/mock-data';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -535,11 +533,148 @@ const interactiveLessons: InteractiveLesson[] = [
         explanation: "Contractor access should end when the work ends so unnecessary exposure does not continue."
       }
     ]
+  },
+  {
+    id: 'website-scans-1',
+    title: 'Understanding Website Scans (Part 1)',
+    description: 'Learn the basics of vulnerability scanning and the OWASP Top 10.',
+    duration: '3 min',
+    category: 'Web Security',
+    steps: [
+      {
+        title: "What is a Vulnerability Scan?",
+        content: <p>A vulnerability scan is an automated process that inspects your website for security weaknesses. Think of it like a digital security guard walking around your building, checking to see if any doors are unlocked or windows are left open before a burglar can find them.</p>
+      },
+      {
+        title: "The OWASP Top 10",
+        content: (
+          <ul className="list-disc pl-5 space-y-2">
+            <li>The <strong>OWASP Top 10</strong> is an industry-standard awareness document for developers and web application security.</li>
+            <li>It represents a broad consensus about the most critical security risks to web applications (such as broken authentication or cryptographic failures).</li>
+            <li>SecureWebOps maps its findings directly to these categories to help you understand the specific nature of a threat.</li>
+          </ul>
+        )
+      },
+    ],
+    quiz: [
+      {
+        question: "What is the primary purpose of a website vulnerability scan?",
+        options: [
+          "To increase the website's loading speed.",
+          "To find and report security weaknesses before attackers can exploit them.",
+          "To block incoming malware and viruses.",
+          "To automatically update the website's code to the latest version."
+        ],
+        correctIndex: 1,
+        explanation: "Scanners identify vulnerabilities so you can fix them proactively. They do not block attacks (like a firewall) or update code automatically."
+      },
+      {
+        question: "What is the OWASP Top 10?",
+        options: [
+          "A list of the top 10 most secure websites in the world.",
+          "A ranking of the most critical web application security risks.",
+          "A set of 10 passwords you should never use.",
+          "A premium antivirus software package."
+        ],
+        correctIndex: 1,
+        explanation: "The OWASP Top 10 is a globally recognized document outlining the most critical security risks to web applications."
+      },
+      {
+        question: "Is running a vulnerability scan a one-time task?",
+        options: [
+          "Yes, once it is secure, it stays secure forever.",
+          "No, new vulnerabilities are discovered daily, so scanning should be continuous or regular.",
+          "Yes, unless you change your domain name.",
+          "Yes, but only if you get a score of 100."
+        ],
+        correctIndex: 1,
+        explanation: "Security is an ongoing process. Updates to your site, or the discovery of new exploit methods, require regular re-scanning."
+      },
+      {
+        question: "Which of the following issues is a vulnerability scanner likely to find?",
+        options: [
+          "An employee writing their password on a sticky note.",
+          "Missing HTTP security headers on your web server.",
+          "A physical break-in at your office.",
+          "A phishing email in your inbox."
+        ],
+        correctIndex: 1,
+        explanation: "Web vulnerability scanners inspect the code, configurations, and headers of your website—not physical security or personal inboxes."
+      }
+    ]
+  },
+  {
+    id: 'website-scans-2',
+    title: 'Understanding Website Scans (Part 2)',
+    description: 'Learn how to read scan results and take action to secure your site.',
+    duration: '3 min',
+    category: 'Web Security',
+    steps: [
+      {
+        title: "Reading the Results",
+        content: <p>Scan results are graded by severity. <strong>Critical</strong> and <strong>High</strong> severity issues indicate glaring holes that could lead to an immediate data breach or site takeover. <strong>Medium</strong> and <strong>Low</strong> issues are weaknesses that weaken your defense or could be chained together by a clever attacker.</p>
+      },
+      {
+        title: "Taking Action",
+        content: (
+          <ul className="list-disc pl-5 space-y-2">
+            <li>Always prioritize fixing Critical and High severity issues immediately.</li>
+            <li>Review the "Recommendations" provided in the scan report and apply the fixes to your server or code.</li>
+            <li>After applying a fix, <strong>always run a new scan</strong> to verify the issue is actually resolved!</li>
+          </ul>
+        )
+      }
+    ],
+    quiz: [
+      {
+        question: "How should you prioritize fixing vulnerabilities found in a scan report?",
+        options: [
+          "Fix the easiest ones first to get them out of the way.",
+          "Fix the Low severity ones first to build momentum.",
+          "Address Critical and High severity issues immediately.",
+          "Wait until the end of the year to fix them all at once."
+        ],
+        correctIndex: 2,
+        explanation: "Critical and High severity issues pose the most immediate risk to your business and should be mitigated as soon as possible."
+      },
+      {
+        question: "What should you do immediately after applying a fix for a vulnerability?",
+        options: [
+          "Assume it is fixed and forget about it.",
+          "Run another security scan to verify the fix was successful.",
+          "Delete the old scan report.",
+          "Change your account password."
+        ],
+        correctIndex: 1,
+        explanation: "Always verify your remediations by running a fresh scan. Sometimes a fix doesn't cover all affected areas of the application."
+      },
+      {
+        question: "If a scanner reports a 'False Positive', what does that mean?",
+        options: [
+          "The scanner missed a real vulnerability.",
+          "The scanner flagged something as a vulnerability, but it actually is not a threat.",
+          "The website is perfectly secure.",
+          "The scanner crashed during the test."
+        ],
+        correctIndex: 1,
+        explanation: "Scanners rely on automated patterns and sometimes misinterpret safe configurations as threats. These are called false positives."
+      },
+      {
+        question: "Why might a 'Low' severity issue still be worth fixing eventually?",
+        options: [
+          "It will eventually upgrade itself to Critical automatically.",
+          "Attackers can sometimes chain multiple low-severity issues together to execute a larger attack.",
+          "It makes the website load slower.",
+          "It costs more money to leave it unfixed."
+        ],
+        correctIndex: 1,
+        explanation: "In modern attacks, hackers often combine several minor weaknesses (like information disclosure) to achieve a major compromise."
+      }
+    ]
   }
 ];
 
 export default function Training() {
-  const [activeTab, setActiveTab] = useState('lessons');
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -551,11 +686,18 @@ export default function Training() {
   const [lessonStep, setLessonStep] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
   const [showQuizResult, setShowQuizResult] = useState(false);
+  const [savedProgress, setSavedProgress] = useState<Record<string, { step: number, answers: number[] }>>({});
 
   // Fetch progress on load
   useEffect(() => {
     if (user?.user_metadata?.completed_lessons) {
       setCompletedLessons(user.user_metadata.completed_lessons);
+    }
+    if (user?.id) {
+      try {
+        const raw = localStorage.getItem(`securewebops_training_progress_${user.id}`);
+        if (raw) setSavedProgress(JSON.parse(raw));
+      } catch (e) {}
     }
     setIsLoadingProgress(false);
   }, [user]);
@@ -566,9 +708,26 @@ export default function Training() {
 
   const openLesson = (lesson: InteractiveLesson) => {
     setActiveLesson(lesson);
-    setLessonStep(0);
-    setQuizAnswers(Array(lesson.quiz.length).fill(-1));
+    if (savedProgress[lesson.id]) {
+      setLessonStep(savedProgress[lesson.id].step);
+      setQuizAnswers(savedProgress[lesson.id].answers);
+    } else {
+      setLessonStep(0);
+      setQuizAnswers(Array(lesson.quiz.length).fill(-1));
+    }
     setShowQuizResult(false);
+  };
+
+  const handleSaveAndClose = () => {
+    if (!activeLesson || !user) return;
+    const nextProgress = {
+      ...savedProgress,
+      [activeLesson.id]: { step: lessonStep, answers: quizAnswers }
+    };
+    setSavedProgress(nextProgress);
+    localStorage.setItem(`securewebops_training_progress_${user.id}`, JSON.stringify(nextProgress));
+    closeLesson();
+    toast({ title: "Progress Saved", description: "You can resume this lesson later." });
   };
 
   const closeLesson = () => {
@@ -609,6 +768,11 @@ export default function Training() {
       
       // Persist to user metadata
       if (user) {
+        const nextProgress = { ...savedProgress };
+        delete nextProgress[activeLesson.id];
+        setSavedProgress(nextProgress);
+        localStorage.setItem(`securewebops_training_progress_${user.id}`, JSON.stringify(nextProgress));
+
         await supabase.auth.updateUser({
           data: { completed_lessons: newCompleted }
         });
@@ -658,38 +822,25 @@ export default function Training() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="lessons" className="gap-2">
-            <PlayCircle className="w-4 h-4" />
-            Lessons
-          </TabsTrigger>
-          <TabsTrigger value="simulations" className="gap-2">
-            <Mail className="w-4 h-4" />
-            Simulations
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lessons" className="mt-6">
-          <div className="space-y-3">
+      {/* Lessons List */}
+      <div className="mt-6 space-y-3">
             {interactiveLessons.map((lesson) => {
               const isCompleted = completedLessons.includes(lesson.id);
               
               return (
                 <Card 
                   key={lesson.id} 
-                  className={cn("transition-all hover:shadow-md", isCompleted ? "bg-slate-50 border-slate-200" : "bg-white")}
+                  className={cn("transition-all hover:shadow-md", isCompleted ? "bg-slate-50 border-slate-200 dark:bg-slate-800/50 dark:border-slate-700" : "bg-white dark:bg-slate-950")}
                 >
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-start gap-4">
                       {/* Status Icon */}
                       <div className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                        isCompleted ? "bg-green-100" : "bg-primary/10"
+                        isCompleted ? "bg-green-100 dark:bg-green-900/30" : "bg-primary/10"
                       )}>
                         {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                         ) : (
                           <PlayCircle className="w-5 h-5 text-primary" />
                         )}
@@ -698,9 +849,9 @@ export default function Training() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h3 className={cn("font-semibold", isCompleted && "text-slate-700")}>{lesson.title}</h3>
+                          <h3 className={cn("font-semibold", isCompleted && "text-slate-700 dark:text-slate-200")}>{lesson.title}</h3>
                           {isCompleted && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>
+                            <Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">Completed</Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{lesson.description}</p>
@@ -719,7 +870,7 @@ export default function Training() {
                         size="sm"
                         onClick={() => openLesson(lesson)}
                       >
-                        {isCompleted ? 'Review' : 'Start Lesson'}
+                        {isCompleted ? 'Review' : savedProgress[lesson.id] ? 'Resume' : 'Start Lesson'}
                       </Button>
                     </div>
                   </CardContent>
@@ -727,74 +878,6 @@ export default function Training() {
               );
             })}
           </div>
-        </TabsContent>
-
-        <TabsContent value="simulations" className="mt-6 space-y-6">
-          {/* Info Card */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <h3 className="font-medium flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary" />
-                What are phishing simulations?
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Test your team's ability to spot fake emails by sending simulated phishing attempts. 
-                This helps identify who needs more training without any real risk.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Simulations List */}
-          <div className="space-y-3">
-            {mockSimulations.map((sim) => (
-              <Card key={sim.id} className="hover:shadow-md transition-all">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-semibold">{sim.name}</h3>
-                        <Badge variant={sim.status === 'completed' ? 'secondary' : sim.status === 'running' ? 'default' : 'outline'}>
-                          {sim.status.charAt(0).toUpperCase() + sim.status.slice(1)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">Template: {sim.template}</p>
-                      
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          {sim.recipients} recipients
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {format(new Date(sim.scheduledFor), 'MMM d, yyyy · h:mm a')}
-                        </span>
-                        {sim.clickRate !== undefined && (
-                          <span className="font-medium text-amber-600">
-                            {sim.clickRate}% clicked
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <Button variant="outline" size="sm">
-                      {sim.status === 'completed' ? 'View Results' : 'Details'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Button className="w-full">
-            <Mail className="w-4 h-4 mr-2" />
-            Create New Simulation
-          </Button>
-        </TabsContent>
-      </Tabs>
 
       {/* Interactive Lesson Modal */}
       {activeLesson && (
@@ -833,8 +916,8 @@ export default function Training() {
                       <div className={cn(
                         "rounded-xl border px-4 py-3",
                         quizScore === activeLesson.quiz.length
-                          ? "border-green-200 bg-green-50 text-green-900"
-                          : "border-amber-200 bg-amber-50 text-amber-900"
+                          ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-100"
+                          : "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100"
                       )}>
                         <p className="text-sm font-semibold">
                           Score: {quizScore}/{activeLesson.quiz.length}
@@ -847,8 +930,8 @@ export default function Training() {
                       </div>
                     )}
                     {activeLesson.quiz.map((quiz, quizIndex) => (
-                      <div key={quizIndex} className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                        <p className="text-slate-800 font-medium">
+                      <div key={quizIndex} className="space-y-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4">
+                        <p className="text-slate-800 dark:text-slate-200 font-medium">
                           {quizIndex + 1}. {quiz.question}
                         </p>
 
@@ -868,10 +951,10 @@ export default function Training() {
                             <div
                               key={optionIndex}
                               className={cn(
-                                "flex items-start space-x-3 space-y-0 rounded-lg border bg-white p-4 transition-all cursor-pointer hover:bg-slate-50",
+                                "flex items-start space-x-3 space-y-0 rounded-lg border bg-white dark:bg-slate-950 p-4 transition-all cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900",
                                 quizAnswers[quizIndex] === optionIndex && !showQuizResult && "border-primary bg-primary/5",
-                                showQuizResult && optionIndex === quiz.correctIndex && "border-green-500 bg-green-50",
-                                showQuizResult && quizAnswers[quizIndex] === optionIndex && optionIndex !== quiz.correctIndex && "border-red-500 bg-red-50"
+                                showQuizResult && optionIndex === quiz.correctIndex && "border-green-500 bg-green-50 dark:bg-green-900/30",
+                                showQuizResult && quizAnswers[quizIndex] === optionIndex && optionIndex !== quiz.correctIndex && "border-red-500 bg-red-50 dark:bg-red-900/30"
                               )}
                               onClick={() => {
                                 if (showQuizResult) return;
@@ -892,12 +975,12 @@ export default function Training() {
                         {showQuizResult && (
                           <div className={cn(
                             "p-4 rounded-lg flex gap-3 animate-in fade-in slide-in-from-bottom-2",
-                            quizAnswers[quizIndex] === quiz.correctIndex ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"
+                              quizAnswers[quizIndex] === quiz.correctIndex ? "bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-100" : "bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-100"
                           )}>
                             {quizAnswers[quizIndex] === quiz.correctIndex ? (
-                              <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
+                                <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400 shrink-0" />
                             ) : (
-                              <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
+                                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0" />
                             )}
                             <div>
                               <p className="font-semibold">
@@ -924,13 +1007,19 @@ export default function Training() {
               </Button>
 
               {lessonStep < activeLesson.steps.length ? (
-                <Button onClick={handleNextStep}>
-                  Next <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleSaveAndClose}>Save & Close</Button>
+                  <Button onClick={handleNextStep}>
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
               ) : !showQuizResult ? (
-                <Button onClick={submitQuiz} disabled={quizAnswers.some((answer) => answer === -1)}>
-                  Submit Answers
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleSaveAndClose}>Save & Close</Button>
+                  <Button onClick={submitQuiz} disabled={quizAnswers.some((answer) => answer === -1)}>
+                    Submit Answers
+                  </Button>
+                </div>
               ) : (
                 <div className="flex gap-2">
                   {!activeLesson.quiz.every((question, index) => quizAnswers[index] === question.correctIndex) && (

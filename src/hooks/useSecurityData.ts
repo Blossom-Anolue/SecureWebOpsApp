@@ -331,6 +331,7 @@ export function useAddDomain() {
           domain,
           user_id: user!.id,
           organization_id: organizationId ?? null,
+          is_verified: true,
         })
         .select()
         .single();
@@ -692,7 +693,7 @@ export function useUpdateProfile() {
 
         const legacyUpdateResult = await supabase
           .from('profiles')
-          .update(legacyUpdatePayload)
+          .update(legacyUpdatePayload as any)
           .eq('id', user!.id)
           .select('*')
           .maybeSingle();
@@ -714,7 +715,7 @@ export function useUpdateProfile() {
 
       let insertResult = await supabase
         .from('profiles')
-        .insert(insertPayload)
+        .insert(insertPayload as any)
         .select()
         .single();
 
@@ -728,7 +729,7 @@ export function useUpdateProfile() {
 
         insertResult = await supabase
           .from('profiles')
-          .insert(insertPayload)
+          .insert(insertPayload as any)
           .select('*')
           .single();
       }

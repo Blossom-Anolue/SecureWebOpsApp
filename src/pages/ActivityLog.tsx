@@ -102,6 +102,8 @@ export default function ActivityLogPage() {
   const [hiddenLogIds, setHiddenLogIds] = useState<Set<string>>(new Set());
   const [decryptLog, setDecryptLog] = useState<{id: string, fileId: string, fileName: string} | null>(null);
   const [decryptEmail, setDecryptEmail] = useState('');
+  const [selectedLogs, setSelectedLogs] = useState<Set<string>>(new Set());
+  const [isBulkClearing, setIsBulkClearing] = useState(false);
   const { toast } = useToast();
   
   const { data: logs, isLoading } = useActivityLogs(selectedOrgId, 100);
@@ -191,6 +193,42 @@ export default function ActivityLogPage() {
     }
   };
 
+  const toggleLogSelection = (id: string) => {
+    const next = new Set(selectedLogs);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedLogs(next);
+  };
+
+  const toggleAllLogs = () => {
+    if (!filteredLogs) return;
+    const allIds = filteredLogs.map(l => l.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedLogs.has(id));
+    const next = new Set(selectedLogs);
+    if (allSelected) {
+      allIds.forEach(id => next.delete(id));
+    } else {
+      allIds.forEach(id => next.add(id));
+    }
+    setSelectedLogs(next);
+  };
+
+  const handleBulkClearLogs = async () => {
+    if (selectedLogs.size === 0) return;
+    setIsBulkClearing(true);
+    try {
+      const nextIds = new Set(hiddenLogIds);
+      selectedLogs.forEach(id => nextIds.add(id));
+      persistHiddenLogIds(nextIds);
+      toast({ title: 'Success', description: `Cleared ${selectedLogs.size} logs from view.`, className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      setSelectedLogs(new Set());
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to clear selected logs.', variant: 'destructive', className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+    } finally {
+      setIsBulkClearing(false);
+    }
+  };
+
   const exportToCSV = () => {
     if (!filteredLogs?.length) return;
 
@@ -262,7 +300,7 @@ export default function ActivityLogPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input 
                 placeholder="Search activity..." 
-                className="pl-9 bg-white w-full"
+                className="pl-9 bg-white dark:bg-slate-950 dark:border-slate-800 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -333,6 +371,23 @@ export default function ActivityLogPage() {
             />
           ) : (
             <div className="space-y-1">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b dark:border-slate-800">
+                <label className="flex items-center gap-3 cursor-pointer text-sm font-medium pl-2">
+                  <input 
+                    type="checkbox"
+                    checked={filteredLogs.length > 0 && filteredLogs.every(l => selectedLogs.has(l.id))}
+                    onChange={toggleAllLogs}
+                    className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary"
+                  />
+                  Select All
+                </label>
+                {selectedLogs.size > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleBulkClearLogs} disabled={isBulkClearing} className="h-8">
+                    {isBulkClearing ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <X className="w-4 h-4 mr-2" />}
+                    Clear Selected
+                  </Button>
+                )}
+              </div>
               {filteredLogs.map((log, index) => {
                 const actionStr = String(log.action || '');
                 const config = ACTION_CONFIG[actionStr] || { 
@@ -365,6 +420,14 @@ export default function ActivityLogPage() {
                       </div>
                     )}
                     <div className={`group flex items-start gap-3 p-4 rounded-lg bg-card border-l-4 ${config.border || 'border-muted'} shadow-sm hover:shadow-md transition-all mb-2 relative`}>
+                      <div className="pt-1">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedLogs.has(log.id)} 
+                          onChange={() => toggleLogSelection(log.id)} 
+                          className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary" 
+                        />
+                      </div>
                       <div className={`p-2 rounded-full ${config.iconBg} ${config.color}`}>
                         <Icon className="w-4 h-4" />
                       </div>

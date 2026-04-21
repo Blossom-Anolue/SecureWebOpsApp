@@ -164,7 +164,14 @@ async function zapGet(path, params) {
     url.searchParams.set('apikey', config.apiKey);
   }
 
-  const response = await withTimeout(url.toString());
+  let response;
+  try {
+    response = await withTimeout(url.toString());
+  } catch (err) {
+    // Catch network connectivity errors specifically (like ECONNREFUSED)
+    throw new Error(`Cannot connect to OWASP ZAP at ${config.baseUrl}. Is ZAP running and listening on the correct port? (${err.message})`);
+  }
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`ZAP API request failed (${response.status}): ${text}`);
@@ -908,10 +915,15 @@ async function runZapSecurityScan(target, scanType) {
 
   const config = getZapConfig();
 
-  await zapGet('JSON/core/action/newSession/', {
-    name: `scan-${Date.now()}`,
-    overwrite: true,
-  });
+  try {
+    await zapGet('JSON/core/action/newSession/', {
+      name: `scan-${Date.now()}`,
+      overwrite: true,
+    });
+  } catch (error) {
+    console.warn(`[ZAP] Connection failed (${error.message}). Auto-falling back to cloud scanner (Observatory)...`);
+    return runHostedSecurityScan(target, scanType);
+  }
 
   // Prime ZAP with the target so it exists in the Sites Tree
   try {
@@ -1169,7 +1181,7 @@ export async function createAndStartScan({
   source = 'node_api',
 }) {
   const validatedTarget = await validateTargetUrl(target);
-  const { data: scan, error } = await supabaseAdmin
+  let { data: scan, error } = await supabaseAdmin
     .from('scans')
     .insert({
       domain: validatedTarget.hostname,
@@ -1185,6 +1197,24 @@ export async function createAndStartScan({
     })
     .select('id,status')
     .single();
+
+  if (error && (error.message.includes('organization_id') || error.message.includes('source') || error.message.includes('requested_by_user'))) {
+    const fallbackRes = await supabaseAdmin
+      .from('scans')
+      .insert({
+        domain: validatedTarget.hostname,
+        target_url: validatedTarget.toString(),
+        status: 'queued',
+        created_at: new Date().toISOString(),
+        scan_type: scanType === 'full' ? 'full' : 'quick',
+        user_id: requestedByUser,
+        domain_id: null,
+      })
+      .select('id,status')
+      .single();
+    scan = fallbackRes.data;
+    error = fallbackRes.error;
+  }
 
   if (error || !scan) {
     throw new Error(error?.message || 'Server error creating scan');

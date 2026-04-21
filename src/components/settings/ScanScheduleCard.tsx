@@ -49,6 +49,8 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
   const [dayOfWeek, setDayOfWeek] = useState('1');
   const [dayOfMonth, setDayOfMonth] = useState('1');
   const [scanType, setScanType] = useState<'quick' | 'full'>('quick');
+  const [selectedSchedules, setSelectedSchedules] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const handleCreateSchedule = async () => {
     if (!selectedDomain) {
@@ -123,6 +125,43 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
     }
   };
 
+  const toggleScheduleSelection = (id: string) => {
+    const next = new Set(selectedSchedules);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedSchedules(next);
+  };
+
+  const toggleAllSchedules = () => {
+    if (!schedules) return;
+    const allIds = schedules.map(s => s.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedSchedules.has(id));
+    const next = new Set(selectedSchedules);
+    if (allSelected) {
+      allIds.forEach(id => next.delete(id));
+    } else {
+      allIds.forEach(id => next.add(id));
+    }
+    setSelectedSchedules(next);
+  };
+
+  const handleBulkDeleteSchedules = async () => {
+    if (selectedSchedules.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedSchedules.size} selected schedule(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      for (const id of Array.from(selectedSchedules)) {
+        await deleteSchedule.mutateAsync(id);
+      }
+      toast({ title: "Schedules deleted", description: `Successfully removed ${selectedSchedules.size} schedule(s).` });
+      setSelectedSchedules(new Set());
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete some schedules.", variant: "destructive" });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const getScheduleDescription = (schedule: ScanSchedule) => {
     if (schedule.frequency === 'weekly') {
       const day = DAYS_OF_WEEK.find(d => d.value === String(schedule.day_of_week));
@@ -153,12 +192,37 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : schedules && schedules.length > 0 ? (
-          schedules.map((schedule) => (
-            <div
-              key={schedule.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-muted"
-            >
-              <div className="flex-1 min-w-0">
+          <>
+            <div className="flex items-center justify-between pb-3 mb-3 border-b dark:border-slate-800">
+              <label className="flex items-center gap-3 cursor-pointer text-sm font-medium">
+                <input 
+                  type="checkbox"
+                  checked={schedules.length > 0 && schedules.every(s => selectedSchedules.has(s.id))}
+                  onChange={toggleAllSchedules}
+                  className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary"
+                />
+                Select All
+              </label>
+              {selectedSchedules.size > 0 && (
+                <Button variant="destructive" size="sm" onClick={handleBulkDeleteSchedules} disabled={isBulkDeleting} className="h-8">
+                  {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Delete Selected
+                </Button>
+              )}
+            </div>
+            {schedules.map((schedule) => (
+              <div
+                key={schedule.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedSchedules.has(schedule.id)} 
+                    onChange={() => toggleScheduleSelection(schedule.id)} 
+                    className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary shrink-0" 
+                  />
+                  <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
                   {schedule.domains?.domain || 'Unknown domain'}
                 </p>
@@ -176,6 +240,7 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
                   </p>
                 )}
               </div>
+                </div>
               <div className="flex items-center gap-2 ml-2">
                 <Switch
                   checked={schedule.is_active}
@@ -191,7 +256,8 @@ export function ScanScheduleCard({ domains }: ScanScheduleCardProps) {
                 </Button>
               </div>
             </div>
-          ))
+            ))}
+          </>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-4">
             No scheduled scans. Set up automatic scanning to stay protected.

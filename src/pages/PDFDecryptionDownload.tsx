@@ -26,6 +26,8 @@ export default function PDFDecryptionDownload() {
     const [isRecovering, setIsRecovering] = useState(false);
     const [isRecoverDragging, setIsRecoverDragging] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     const { toast } = useToast();
     const { log } = useActivityLogger();
     const navigate = useNavigate();
@@ -347,33 +349,117 @@ export default function PDFDecryptionDownload() {
         }
     };
 
+    const toggleFileSelection = (id: string) => {
+        const next = new Set(selectedFiles);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedFiles(next);
+    };
+
+    const toggleAll = (items: any[]) => {
+        const allIds = items.map(i => i.file.id);
+        const allSelected = allIds.length > 0 && allIds.every(id => selectedFiles.has(id));
+        const next = new Set(selectedFiles);
+        if (allSelected) {
+            allIds.forEach(id => next.delete(id));
+        } else {
+            allIds.forEach(id => next.add(id));
+        }
+        setSelectedFiles(next);
+    };
+
+    const handleBulkDelete = async (items: any[]) => {
+        const idsToDelete = items.map(i => i.file.id).filter(id => selectedFiles.has(id));
+        if (idsToDelete.length === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${idsToDelete.length} selected file(s)?`)) return;
+
+        setIsBulkDeleting(true);
+        toast({ title: "Processing...", description: `Deleting ${idsToDelete.length} file(s).` });
+        
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const id of idsToDelete) {
+                const file = items.find(f => f.file.id === id);
+                if (!file) continue;
+                const isOwned = file.owned || file.permission_level === 'ADMIN';
+                const endpoint = isOwned ? `/api/pdf/${id}` : `/api/pdf/share/${id}/remove`;
+                const res = await fetch(endpoint, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session?.access_token}` } });
+                if (res.ok) {
+                    successCount++;
+                    log(isOwned ? 'FILE_PURGED' : ('SHARE_REMOVED' as any), 'file', { resourceId: id, details: { fileName: file.file.file_name } });
+                } else {
+                    failCount++;
+                }
+            }
+
+            toast({ title: "Bulk Delete Complete", description: `Successfully removed ${successCount} file(s). ${failCount > 0 ? `Failed to remove ${failCount} file(s).` : ''}`, variant: failCount > 0 ? "destructive" : "default" });
+            const next = new Set(selectedFiles);
+            idsToDelete.forEach(id => next.delete(id));
+            setSelectedFiles(next);
+            loadFiles();
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Bulk deletion failed.", variant: "destructive" });
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
+
     const renderFileGroup = (items: any[], emptyMessage: string) => {
         if (items.length === 0) {
             return (
-                <div className="rounded-b-xl border border-t-0 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                <div className="rounded-b-xl border dark:border-slate-800/80 border-t-0 bg-slate-50 dark:bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                     {emptyMessage}
                 </div>
             );
         }
 
+        const allSelected = items.length > 0 && items.every(i => selectedFiles.has(i.file.id));
+        const anySelected = items.some(i => selectedFiles.has(i.file.id));
+
         return (
-            <div className="grid gap-4 rounded-b-xl border border-t-0 bg-white p-4">
+            <div className="grid gap-4 rounded-b-xl border dark:border-slate-800/80 border-t-0 bg-white dark:bg-slate-900/30 p-4">
+                <div className="flex items-center justify-between pb-2 border-b dark:border-slate-700/50">
+                    <label className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
+                        <input 
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={() => toggleAll(items)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer accent-primary"
+                        />
+                        Select All
+                    </label>
+                    {anySelected && (
+                        <Button variant="destructive" size="sm" onClick={() => handleBulkDelete(items)} disabled={isBulkDeleting} className="h-8">
+                            {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Trash2 className="w-4 h-4 mr-2" />}
+                            Delete Selected
+                        </Button>
+                    )}
+                </div>
                 {items.map(item => (
-                    <div key={item.file?.id} className="flex items-center justify-between p-4 border rounded-xl bg-white shadow-sm hover:border-primary/30 transition-colors">
-                        <div className="flex items-center gap-4">
-                            <div className="p-2 bg-slate-50 rounded-lg">
+                    <div key={item.file?.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border dark:border-slate-700/60 rounded-xl bg-white dark:bg-slate-900/50 shadow-sm hover:shadow-md hover:border-primary/40 dark:hover:border-primary/60 dark:hover:bg-slate-800/80 transition-all duration-300">
+                        <div className="flex items-center gap-4 min-w-0">
+                            <input 
+                                type="checkbox"
+                                checked={selectedFiles.has(item.file.id)}
+                                onChange={() => toggleFileSelection(item.file.id)}
+                                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+                            />
+                            <div className="p-2 bg-slate-50 dark:bg-slate-800/80 dark:border dark:border-slate-700/50 rounded-lg">
                                 <FileText className="text-primary w-6 h-6" />
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-semibold text-slate-800">{item.file?.file_name}</p>
-                                    <Badge variant="outline" className={item.owned ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 bg-blue-50 text-blue-700'}>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-100">{item.file?.file_name}</p>
+                                    <Badge variant="outline" className={item.owned ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'}>
                                         {item.owned ? 'My File' : 'Shared With Me'}
                                     </Badge>
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
-                                        item.permission_level === 'ADMIN' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                                        item.permission_level === 'ADMIN' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800'
                                     }`}>
                                         {item.permission_level}
                                     </span>
@@ -390,7 +476,7 @@ export default function PDFDecryptionDownload() {
                                 <>
                                     <button 
                                         onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name})} 
-                                        className="p-2 hover:bg-slate-100 rounded-lg text-primary transition-colors"
+                                        className="p-2 hover:bg-primary/10 dark:hover:bg-primary/25 rounded-lg text-primary dark:text-primary transition-colors"
                                         title="Decrypt & Download"
                                     >
                                         <Download size={20}/>
@@ -399,7 +485,7 @@ export default function PDFDecryptionDownload() {
                                     {(item.permission_level === 'DOWNLOAD' || item.permission_level === 'ADMIN') && (
                                     <button 
                                         onClick={() => handleDownloadRaw(item.file.id, item.file.file_name)} 
-                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
                                         title="Download Raw Encrypted File"
                                     >
                                         <Lock size={20}/>
@@ -412,7 +498,7 @@ export default function PDFDecryptionDownload() {
                                 <>
                                     <button 
                                         onClick={() => setSharingFile(item.file)} 
-                                        className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
+                                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-lg text-blue-600 dark:text-blue-400 transition-colors"
                                         title="File Sharing"
                                     >
                                         <Share2 size={20}/>
@@ -420,7 +506,7 @@ export default function PDFDecryptionDownload() {
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(item.file.id, item.file.file_name)} 
-                                        className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg text-red-500 dark:text-red-400 transition-colors"
                                         title="Purge File"
                                     >
                                         <Trash2 size={20}/>
@@ -430,7 +516,7 @@ export default function PDFDecryptionDownload() {
                         {!item.owned && (
                             <button 
                                 onClick={() => handleRemoveShared(item.file.id, item.file.file_name)} 
-                                className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg text-red-500 dark:text-red-400 transition-colors"
                                 title="Remove from my vault"
                             >
                                 <Trash2 size={20}/>
@@ -447,7 +533,7 @@ export default function PDFDecryptionDownload() {
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-semibold text-slate-900">My Vault & Sharing</h2>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">My Vault & Sharing</h2>
                     <p className="text-sm text-slate-500">Decrypt, share, and manage encrypted files already stored in the vault.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -475,7 +561,7 @@ export default function PDFDecryptionDownload() {
                     <Loader2 className="w-8 h-8 animate-spin" />
                 </div>
             ) : files.length === 0 ? (
-                <div className="text-center p-12 border-2 border-dashed rounded-xl bg-slate-50">
+                <div className="text-center p-12 border-2 border-dashed rounded-xl bg-slate-50 dark:bg-slate-900/40 dark:border-slate-700/60">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                     <p className="text-slate-600 font-medium">Vault is empty</p>
                     <p className="text-sm text-slate-400 mt-1">Files you upload or receive will appear here.</p>
@@ -501,7 +587,7 @@ export default function PDFDecryptionDownload() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input 
                                 placeholder="Search files..." 
-                                className="pl-9 bg-white w-full"
+                                className="pl-9 bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-primary w-full"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -510,13 +596,13 @@ export default function PDFDecryptionDownload() {
 
                     <TabsContent value="my-files" className="mt-0">
                         <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="rounded-t-xl border bg-emerald-50/70 px-4 py-3">
+                            <div className="rounded-t-xl border dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-semibold text-slate-900">My Files</h3>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">My Files</h3>
                                         <p className="text-xs text-slate-500">Files you uploaded and fully manage.</p>
                                     </div>
-                                    <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">{ownedFiles.length}</Badge>
+                                    <Badge variant="outline" className="border-emerald-200 dark:border-emerald-800 bg-white dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400">{ownedFiles.length}</Badge>
                                 </div>
                             </div>
                             {renderFileGroup(ownedFiles, 'You have not uploaded any encrypted files yet.')}
@@ -525,13 +611,13 @@ export default function PDFDecryptionDownload() {
 
                     <TabsContent value="shared" className="mt-0">
                         <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="rounded-t-xl border bg-blue-50/70 px-4 py-3">
+                            <div className="rounded-t-xl border dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/20 px-4 py-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-semibold text-slate-900">Shared With Me</h3>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Shared With Me</h3>
                                         <p className="text-xs text-slate-500">Files other people have granted you access to.</p>
                                     </div>
-                                    <Badge variant="outline" className="border-blue-200 bg-white text-blue-700">{sharedFiles.length}</Badge>
+                                    <Badge variant="outline" className="border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">{sharedFiles.length}</Badge>
                                 </div>
                             </div>
                             {renderFileGroup(sharedFiles, 'Files shared with you will appear here.')}
@@ -611,32 +697,34 @@ export default function PDFDecryptionDownload() {
                     setRecoverFile(null);
                 }
             }}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg border-slate-200 dark:border-slate-800 shadow-xl">
                     <DialogHeader>
                         <DialogTitle>Recover Encrypted File</DialogTitle>
                         <DialogDescription>
-                            Upload a raw encrypted file (e.g. <code className="text-xs bg-slate-100 px-1 rounded">_encrypted.pdf</code>) to securely verify ownership and decrypt it.
+                            Upload a raw encrypted file (e.g. <code className="text-xs bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-1 rounded">_encrypted.pdf</code>) to securely verify ownership and decrypt it.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <div 
-                            className={`relative group border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center space-y-4 transition-all ${
+                            className={`relative group border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center space-y-4 transition-all duration-300 ease-in-out ${
                                 recoverFile
-                                    ? 'border-primary bg-primary/5' 
+                                    ? 'border-primary bg-primary/5 shadow-inner' 
                                     : isRecoverDragging
-                                    ? 'border-primary bg-primary/10 scale-[1.02]'
-                                    : 'border-slate-300 hover:border-primary/50 hover:bg-slate-50'
+                                    ? 'border-primary bg-primary/10 scale-[1.02] shadow-lg'
+                                    : 'border-slate-300 dark:border-slate-700 hover:border-primary/50 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/80'
                             }`}
                             onDragOver={handleRecoverDragOver}
                             onDragLeave={handleRecoverDragLeave}
                             onDrop={handleRecoverDrop}
                         >
-                            <div className={`p-3 rounded-full transition-colors ${recoverFile ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            <div className={`absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl pointer-events-none ${recoverFile ? 'opacity-100' : ''}`} />
+                            
+                            <div className={`p-4 rounded-full transition-transform duration-300 relative z-10 ${recoverFile ? 'bg-primary text-white scale-110 shadow-md' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:scale-110 group-hover:bg-primary/20 group-hover:text-primary'}`}>
                                 {recoverFile ? <FileText className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
                             </div>
                             
                             <div className="text-center relative z-10">
-                                <p className="font-medium text-sm text-slate-800">
+                                <p className="font-semibold text-base text-slate-800 dark:text-slate-200">
                                     {recoverFile ? recoverFile.name : "Drag & drop your encrypted file here"}
                                 </p>
                                 {recoverFile && (
@@ -660,7 +748,7 @@ export default function PDFDecryptionDownload() {
                             {!recoverFile && (
                                 <label 
                                     htmlFor="recover-upload" 
-                                    className="relative z-10 px-4 py-2 rounded-full cursor-pointer text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:border-primary/30 hover:text-primary transition-all shadow-sm"
+                                    className="relative z-10 px-6 py-2.5 rounded-full cursor-pointer text-sm font-medium bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary/30 hover:text-primary transition-all shadow-sm mt-2 inline-block"
                                 >
                                     Browse Files
                                 </label>
@@ -669,7 +757,7 @@ export default function PDFDecryptionDownload() {
                                 <button 
                                     type="button" 
                                     onClick={() => setRecoverFile(null)} 
-                                    className="text-xs text-red-500 hover:underline mt-2"
+                                    className="text-xs text-red-500 hover:underline mt-3 relative z-10"
                                 >
                                     Remove file
                                 </button>
@@ -686,6 +774,7 @@ export default function PDFDecryptionDownload() {
                         <Button 
                             onClick={handleRecoverFile}
                             disabled={!recoverFile || isRecovering}
+                            className="bg-primary hover:bg-primary/90 text-white shadow-sm"
                         >
                             {isRecovering ? (
                                 <>
