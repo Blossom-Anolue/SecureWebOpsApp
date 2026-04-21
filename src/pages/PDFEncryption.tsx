@@ -188,7 +188,7 @@ export default function PDFEncryption() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid lg:grid-cols-12 gap-8">
         {/* Upload Section */}
-        <Card className="lg:col-span-7 border-slate-200/60 shadow-lg bg-white/50 backdrop-blur-xl">
+        <Card className="lg:col-span-7 border-slate-200/60 dark:border-slate-800 shadow-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <FileUp className="w-5 h-5 text-primary" />
@@ -205,7 +205,7 @@ export default function PDFEncryption() {
                   ? 'border-primary bg-primary/5 shadow-inner' 
                   : isDragging
                   ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]'
-                  : 'border-slate-300 hover:border-primary/50 hover:bg-primary/[0.02] bg-slate-50/50'
+                  : 'border-slate-300 dark:border-slate-700/60 hover:border-primary/50 hover:bg-primary/[0.02] bg-slate-50/50 dark:bg-slate-900/60 dark:hover:bg-slate-800/80'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -218,13 +218,13 @@ export default function PDFEncryption() {
               </div>
               
               <div className="text-center relative z-10">
-                <p className="font-semibold text-lg text-slate-800">
+                <p className="font-semibold text-lg text-slate-800 dark:text-slate-200">
                   {files.length > 0 ? `${files.length} file(s) selected` : "Drag & Drop your PDFs here"}
                 </p>
                 <div className="text-sm text-slate-500 mt-2 max-w-md flex flex-wrap justify-center gap-2">
                   {files.length > 0 
                     ? files.map((f, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 bg-white/80 border border-slate-200 px-2 py-1 rounded-md shadow-sm">
+                        <span key={i} className="inline-flex items-center gap-1 bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md shadow-sm">
                           <span className="truncate max-w-[150px]">{f.name}</span>
                           <button 
                             type="button" 
@@ -252,8 +252,8 @@ export default function PDFEncryption() {
                 htmlFor="pdf-upload" 
                 className={`relative z-10 px-6 py-2.5 rounded-full cursor-pointer font-medium transition-all shadow-sm ${
                   files.length > 0 
-                    ? 'bg-white text-primary border border-primary/20 hover:bg-slate-50 mt-4 inline-block' 
-                    : 'bg-white border border-slate-200 text-slate-700 hover:border-primary/30 hover:text-primary hover:shadow'
+                    ? 'bg-white dark:bg-slate-950 text-primary border border-primary/20 hover:bg-slate-50 dark:hover:bg-slate-900 mt-4 inline-block' 
+                    : 'bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary/30 hover:text-primary hover:shadow'
                 }`}
               >
                 {files.length > 0 ? 'Add More Files' : 'Browse Files'}
@@ -301,28 +301,28 @@ export default function PDFEncryption() {
           {status === 'success' && results.length > 0 ? (
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
               {results.map((res, index) => (
-                <Card key={index} className="bg-emerald-50/80 border-emerald-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                <Card key={index} className="bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-emerald-800 flex items-center gap-2 text-lg">
+                    <CardTitle className="text-emerald-800 dark:text-emerald-400 flex items-center gap-2 text-lg">
                       <CheckCircle className="text-emerald-600 w-5 h-5" />
                       Encryption Verified
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3 text-sm text-emerald-900/80">
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                  <CardContent className="space-y-3 text-sm text-emerald-900/80 dark:text-emerald-200/80">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
                       <span className="font-medium">Original File</span>
                       <span className="truncate pl-4">{res.originalFileName}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
                       <span className="font-medium">Vault Path</span>
                       <span className="truncate pl-4 font-mono text-xs">{res.path}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
                       <span className="font-medium">Cipher</span>
-                      <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">AES-256-GCM</Badge>
+                      <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">AES-256-GCM</Badge>
                     </div>
                     <div className="pt-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100/50 text-emerald-700 text-[10px] uppercase font-mono tracking-wider font-semibold border border-emerald-200/50">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100/50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-[10px] uppercase font-mono tracking-wider font-semibold border border-emerald-200/50 dark:border-emerald-800/50">
                         <CheckCircle className="w-3 h-3" /> MD5_HASH_VERIFIED: SUCCESS
                       </span>
                     </div>
@@ -361,7 +361,7 @@ export default function PDFEncryption() {
       </div>
 
       <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="py-5 bg-slate-50/80 border-b">
+        <CardHeader className="py-5 bg-slate-50/80 dark:bg-slate-900/80 border-b dark:border-slate-800">
           <div>
             <CardTitle className="text-xl flex items-center gap-2">
               <Database className="w-5 h-5 text-primary" />
@@ -373,7 +373,7 @@ export default function PDFEncryption() {
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="space-y-2">
-              <p className="text-slate-900 font-semibold">Your file is ready whenever you want to come back to it.</p>
+              <p className="text-slate-900 dark:text-slate-100 font-semibold">Your file is ready whenever you want to come back to it.</p>
               <p className="text-sm text-slate-500 max-w-2xl">
                 Open My Vault & Sharing to review what you have protected, download what you need, or share access with the right people.
               </p>

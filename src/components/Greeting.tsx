@@ -1,38 +1,36 @@
-import React, { useEffect, useState } from 'react';
-import { Sun, CloudSun, Moon, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useSecurityData';
+import { useMemo } from 'react';
 
-const Greeting: React.FC = () => {
-  const [greeting, setGreeting] = useState("");
-  const { user, profile, loading } = useAuth();
+export default function Greeting() {
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
 
-  useEffect(() => {
+  // Dynamically calculate the time of day and assign the appropriate greeting and emoji
+  const { greeting, emoji } = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
+    if (hour < 12) return { greeting: 'Good morning', emoji: '☀️' };
+    if (hour < 17) return { greeting: 'Good afternoon', emoji: '👋' };
+    return { greeting: 'Good evening', emoji: '🌙' };
   }, []);
 
-  if (loading) return <Loader2 className="animate-spin text-slate-300" size={20} />;
-
-  // Fallback: Use full_name from profile, then metadata, then email, then 'User'
-  const userName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User";
+  // Gracefully fallback through available names (Full Name -> Username -> Email Prefix -> 'there')
+  const displayName = profile?.full_name 
+    || (profile as any)?.username 
+    || user?.email?.split('@')[0] 
+    || 'there';
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-primary">
-        {greeting === "Good morning" && <Sun size={20} />}
-        {greeting === "Good afternoon" && <CloudSun size={20} />}
-        {greeting === "Good evening" && <Moon size={20} />}
-        <span className="text-xs font-bold uppercase tracking-widest opacity-70">
-          Secure Session Active
-        </span>
-      </div>
-      <h1 className="text-2xl lg:text-4xl font-extrabold font-display tracking-tight text-slate-900 capitalize">
-        {greeting}, {userName}!
+    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500 py-2">
+      <h1 className="text-3xl md:text-4xl font-extrabold font-display tracking-tight text-slate-900 dark:text-white">
+        {greeting},{' '}
+        <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-cyan-500 dark:from-primary dark:to-cyan-400">
+          {displayName}
+        </span>!
       </h1>
+      <span className="text-3xl md:text-4xl inline-block origin-bottom-right transition-transform duration-300 hover:rotate-12 hover:scale-110 cursor-default drop-shadow-sm">
+        {emoji}
+      </span>
     </div>
   );
-};
-
-export default Greeting;
+}

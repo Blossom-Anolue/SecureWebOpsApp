@@ -58,6 +58,8 @@ export default function Team() {
   const [newOrgName, setNewOrgName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('member');
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false);
 
   const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
 
@@ -237,6 +239,44 @@ export default function Team() {
         variant: "destructive",
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
+    }
+  };
+
+  const toggleMemberSelection = (id: string) => {
+    const next = new Set(selectedMembers);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedMembers(next);
+  };
+
+  const toggleAllMembers = (membersList: any[]) => {
+    const manageable = membersList.filter(m => m.user_id !== user?.id && m.role !== 'owner');
+    const allIds = manageable.map(m => m.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedMembers.has(id));
+    const next = new Set(selectedMembers);
+    if (allSelected) {
+      allIds.forEach(id => next.delete(id));
+    } else {
+      allIds.forEach(id => next.add(id));
+    }
+    setSelectedMembers(next);
+  };
+
+  const handleBulkRemoveMembers = async () => {
+    if (!selectedOrg || selectedMembers.size === 0) return;
+    if (!window.confirm(`Are you sure you want to remove ${selectedMembers.size} selected member(s)?`)) return;
+    
+    setIsBulkRemoving(true);
+    try {
+      for (const memberId of Array.from(selectedMembers)) {
+        await removeMember.mutateAsync({ memberId, organizationId: selectedOrg.id });
+      }
+      toast({ title: "Members removed", description: `Successfully removed ${selectedMembers.size} member(s).` });
+      setSelectedMembers(new Set());
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove some members.", variant: "destructive" });
+    } finally {
+      setIsBulkRemoving(false);
     }
   };
 
@@ -521,6 +561,25 @@ export default function Team() {
             </div>
           ) : (
             <div className="space-y-3">
+              {canManageMembers && members?.filter(m => m.user_id !== user?.id && m.role !== 'owner').length! > 0 && (
+                <div className="flex items-center justify-between pb-3 mb-3 border-b dark:border-slate-800">
+                  <label className="flex items-center gap-3 cursor-pointer text-sm font-medium">
+                    <input 
+                      type="checkbox"
+                      checked={members!.filter(m => m.user_id !== user?.id && m.role !== 'owner').length > 0 && members!.filter(m => m.user_id !== user?.id && m.role !== 'owner').every(m => selectedMembers.has(m.id))}
+                      onChange={() => toggleAllMembers(members || [])}
+                      className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary"
+                    />
+                    Select All Manageable
+                  </label>
+                  {selectedMembers.size > 0 && (
+                    <Button variant="destructive" size="sm" onClick={handleBulkRemoveMembers} disabled={isBulkRemoving} className="h-8">
+                      {isBulkRemoving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Trash2 className="w-4 h-4 mr-2" />}
+                      Remove Selected
+                    </Button>
+                  )}
+                </div>
+              )}
               {members?.map((member) => {
                 const RoleIcon = ROLE_CONFIG[member.role].icon;
                 const isCurrentUser = member.user_id === user?.id;
@@ -532,6 +591,14 @@ export default function Team() {
                     className="flex items-center justify-between p-3 rounded-lg bg-muted"
                   >
                     <div className="flex items-center gap-3">
+                      {canManageMembers && !isCurrentUser && member.role !== 'owner' && (
+                        <input 
+                          type="checkbox"
+                          checked={selectedMembers.has(member.id)}
+                          onChange={() => toggleMemberSelection(member.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-primary cursor-pointer accent-primary shrink-0"
+                        />
+                      )}
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <RoleIcon className={`w-5 h-5 ${ROLE_CONFIG[member.role].color}`} />
                       </div>
@@ -606,11 +673,11 @@ export default function Team() {
               const Icon = config.icon;
               const bgBorderClass = config.color.replace('text-', 'bg-');
               return (
-                <div key={role} className="p-4 rounded-xl border bg-gradient-to-br from-white to-slate-50 shadow-sm relative overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
+                <div key={role} className="p-4 rounded-xl border dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 shadow-sm relative overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
                   <div className={`absolute top-0 left-0 w-1 h-full ${bgBorderClass}`} />
                   <div className="flex items-center gap-2 mb-2 relative z-10">
                     <Icon className={`w-4 h-4 ${config.color}`} />
-                    <span className="font-bold text-slate-800">{config.label}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">{config.label}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {role === 'owner' && 'Full control including team deletion'}

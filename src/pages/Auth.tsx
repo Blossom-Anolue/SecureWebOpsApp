@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Shield, Mail, Lock, Loader2, Building2, UserRound, CheckCircle2, XCircle, MailCheck, Briefcase, Eye, EyeOff, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -326,14 +326,16 @@ export default function Auth() {
         {/* LOGO & BRANDING */}
         {/* ================================================================== */}
         <div className="text-center">
-          <div className="relative w-20 h-20 mx-auto mb-6 group">
-            <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full group-hover:bg-primary/30 transition-colors duration-500"></div>
-            <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-xl shadow-primary/20 border border-white/20 overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1/2 bg-white/10 rounded-b-full blur-[2px]"></div>
-              <Shield className="w-10 h-10 text-white drop-shadow-lg relative z-10" />
+          <Link to="/" className="inline-block transition-transform hover:scale-105 duration-300">
+            <div className="relative w-20 h-20 mx-auto mb-6 group">
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full group-hover:bg-primary/30 transition-colors duration-500"></div>
+              <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-xl shadow-primary/20 border border-white/20 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1/2 bg-white/10 rounded-b-full blur-[2px]"></div>
+                <Shield className="w-10 h-10 text-white drop-shadow-lg relative z-10" />
+              </div>
             </div>
-          </div>
-          <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">SecureWebOps</h1>
+            <h1 className="text-3xl font-bold font-display tracking-tight text-slate-900 dark:text-white">SecureWebOps</h1>
+          </Link>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base">Small Business Security Assistant</p>
         </div>
 

@@ -28,7 +28,7 @@ export default function SecureVault() {
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
       {/* Enhanced Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 to-slate-800 p-8 shadow-xl mb-8 border border-slate-700">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-8 shadow-2xl mb-8 border border-slate-700 dark:border-slate-800">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/20 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
         <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
           <Lock className="w-48 h-48 text-white" />
@@ -47,17 +47,17 @@ export default function SecureVault() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl mb-8">
+        <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-100/80 dark:bg-slate-900/80 border dark:border-slate-800 p-1 rounded-xl mb-8">
           <TabsTrigger 
             value="encrypt"
-            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary font-medium transition-all"
+            className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 dark:text-slate-400 data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary font-medium transition-all"
           >
             <FileUp className="w-4 h-4 mr-2" />
             Encrypt New File
           </TabsTrigger>
           <TabsTrigger 
             value="vault" 
-            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary font-medium transition-all"
+            className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 dark:text-slate-400 data-[state=active]:shadow-sm data-[state=active]:text-primary dark:data-[state=active]:text-primary font-medium transition-all"
           >
             <Lock className="w-4 h-4 mr-2" />
             My Files & Sharing

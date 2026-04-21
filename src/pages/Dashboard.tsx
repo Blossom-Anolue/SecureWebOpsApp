@@ -229,35 +229,35 @@ export default function Dashboard() {
             <CardTitle className="text-lg">Quick Summary</CardTitle>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-3 gap-3">
-            <div className="rounded-xl border bg-blue-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-blue-200">
+            <div className="rounded-xl border bg-blue-50/50 dark:bg-blue-950/20 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800">
               <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
                 <Globe className="w-24 h-24 text-blue-600" />
               </div>
               <div className="flex items-center gap-2 mb-2 relative z-10">
                 <Globe className="w-4 h-4 text-blue-600" />
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-800">Monitored Domains</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">Monitored Domains</p>
               </div>
-              <p className="text-3xl font-bold text-slate-900 relative z-10">{domains.length}</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 relative z-10">{domains.length}</p>
             </div>
-            <div className="rounded-xl border bg-emerald-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-emerald-200">
+            <div className="rounded-xl border bg-emerald-50/50 dark:bg-emerald-950/20 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800">
               <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
                 <ShieldCheck className="w-24 h-24 text-emerald-600" />
               </div>
               <div className="flex items-center gap-2 mb-2 relative z-10">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Completed Scans</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Completed Scans</p>
               </div>
-              <p className="text-3xl font-bold text-slate-900 relative z-10">{completedScans.length}</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 relative z-10">{completedScans.length}</p>
             </div>
-            <div className="rounded-xl border bg-purple-50/50 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-purple-200">
+            <div className="rounded-xl border bg-purple-50/50 dark:bg-purple-950/20 p-4 relative overflow-hidden transition-all hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800">
               <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
                 <Lock className="w-24 h-24 text-purple-600" />
               </div>
               <div className="flex items-center gap-2 mb-2 relative z-10">
                 <Lock className="w-4 h-4 text-purple-600" />
-                <p className="text-xs font-bold uppercase tracking-wider text-purple-800">Secured Files</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300">Secured Files</p>
               </div>
-              <p className="text-3xl font-bold text-slate-900 relative z-10">{vaultFileCount}</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 relative z-10">{vaultFileCount}</p>
             </div>
           </CardContent>
         </Card>
