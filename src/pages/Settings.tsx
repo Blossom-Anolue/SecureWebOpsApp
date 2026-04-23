@@ -14,10 +14,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ScanScheduleCard } from '@/components/settings/ScanScheduleCard';
-import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain } from '@/hooks/useSecurityData';
+import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain, useDeleteDomain } from '@/hooks/useSecurityData';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Trash2 } from 'lucide-react';
 
 async function copyTextToClipboard(value: string) {
   if (!value) {
@@ -77,6 +78,7 @@ export default function Settings() {
   const updateProfile = useUpdateProfile();
   const updateNotifications = useUpdateNotificationSettings();
   const addDomain = useAddDomain();
+  const deleteDomain = useDeleteDomain();
 
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -402,6 +404,8 @@ export default function Settings() {
           {domains && domains.length > 0 ? (
             domains.map((domain) => (
               <div key={domain.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
+      
+                {/* LEFT SIDE */}
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{domain.domain}</p>
@@ -411,20 +415,37 @@ export default function Settings() {
                       <Badge variant="secondary" className="text-xs">Personal</Badge>
                     )}
                   </div>
+
                   <p className="text-xs text-muted-foreground">
-                    Added {new Date(domain.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    Added {new Date(domain.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant={domain.is_verified ? 'low' : 'secondary'}>
-                  {domain.is_verified ? 'Verified' : 'Pending'}
-                </Badge>
+
+                {/* RIGHT SIDE */}
+                <div className="flex items-center gap-2">
+                  <Badge variant={domain.is_verified ? 'low' : 'secondary'}>
+                    {domain.is_verified ? 'Verified' : 'Pending'}
+                  </Badge>
+
+                  <button
+                    onClick={() => {
+                      if (confirm('Delete this domain?')) {
+                        deleteDomain.mutate(domain.id);
+                      }
+                    }}
+                    className="text-red-500 hover:text-red-700 flex items-center justify-center"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
               </div>
             ))
-          ) : (
+            ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
               No domains added yet. Add your first domain to start monitoring.
             </p>
-          )}
+          )} 
           
           <Dialog open={isAddDomainOpen} onOpenChange={setIsAddDomainOpen}>
             <DialogTrigger asChild>
