@@ -373,8 +373,31 @@ function dedupeAlerts(alerts) {
 
 function summarizeFindings(findings, scanType, target) {
   const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-  for (const finding of findings) counts[finding.severity] += 1;
-  const penalty = counts.critical * 25 + counts.high * 15 + counts.medium * 8 + counts.low * 3;
+
+  let penalty = 0;
+
+  for (const finding of findings) {
+    counts[finding.severity] += 1;
+
+    let weight = 0;
+
+    // Base severity weights
+    if (finding.severity === 'critical') weight = 25;
+    if (finding.severity === 'high') weight = 15;
+    if (finding.severity === 'medium') weight = 8;
+    if (finding.severity === 'low') weight = 3;
+
+    const isHeaderIssue =
+      finding.category === 'HTTP Security Headers' ||
+      finding.name?.toLowerCase().includes('header');
+
+    if (isHeaderIssue) {
+      weight *= 0.3; // reduce impact by 70%
+    }
+
+    penalty += weight;
+  }
+
   const score = Math.max(0, 100 - penalty);
   const risk = score >= 85 ? 'low' : score >= 60 ? 'medium' : 'high';
 
@@ -935,27 +958,41 @@ async function runZapSecurityScan(target, scanType) {
     console.warn('[ZAP] accessUrl failed, continuing without priming:', error.message);
   }
 
-  const spiderScanId = await startSpiderScan(target, scanType);
+  // 🕷️ Spider (ONLY for full scans)
+  let spiderScanId = null;
 
-  // 🕷️ Spider
-  await waitForPercentage(
-    'ZAP spider scan',
-    async () => {
-      const result = await zapGet('JSON/spider/view/status/', { scanId: spiderScanId });
-      console.log('[ZAP] spider status raw:', result);
-      const percentage = Number(result.status ?? '0');
-      console.log(`[ZAP] Spider progress: ${percentage}%`);
-      return percentage;
-    },
-    config.spiderTimeoutMs,
-    config.pollIntervalMs
-  );
+  if (scanType === 'full') {
+    spiderScanId = await startSpiderScan(target, scanType);
+
+    const MAX_SPIDER_TIME = 15000;
+    const startTime = Date.now();
+
+    await waitForPercentage(
+      'ZAP spider scan',
+      async () => {
+        const result = await zapGet('JSON/spider/view/status/', { scanId: spiderScanId });
+        const percentage = Number(result.status ?? '0');
+
+        console.log(`[ZAP] Spider progress: ${percentage}%`);
+
+        if (Date.now() - startTime > MAX_SPIDER_TIME) {
+          console.log('[ZAP] Spider timeout reached — forcing continuation');
+          return 100;
+        }
+
+        return percentage;
+      },
+      MAX_SPIDER_TIME,
+      config.pollIntervalMs
+    );
+  }
 
   // 🧠 Passive scan
-  await waitForPassiveScan(
-    config.passiveTimeoutMs,
-    config.pollIntervalMs
-  );
+  try {
+    await waitForPassiveScan(10000, config.pollIntervalMs);
+  } catch (e) {
+    console.log('[ZAP] Passive scan timeout — continuing');
+  }
 
   // ⚡ Active scan (FULL only)
   if (scanType === 'full') {
@@ -1108,7 +1145,7 @@ export async function processScan(scanId, target) {
     return;
   }
 
-  await supabaseAdmin
+  const { error: startError } = await supabaseAdmin
     .from('scans')
     .update({
       status: 'running',
@@ -1118,7 +1155,12 @@ export async function processScan(scanId, target) {
       scan_error: null,
     })
     .eq('id', scanId);
-  console.log(`[SCAN] ${scanId} marked running`);
+
+if (startError) {
+  console.error('[START UPDATE FAILED]:', startError);
+} else {
+  console.log('[START UPDATE SUCCESS]');
+}
 
   try {
     const { summary, findings } = await runZapSecurityScan(target, scanType);
@@ -1126,20 +1168,27 @@ export async function processScan(scanId, target) {
 
     await persistScanArtifacts(scanId, scanMeta?.user_id ?? null, summary, findings);
 
-    await supabaseAdmin
+    const { data: completeData, error: completeError } = await supabaseAdmin
       .from('scans')
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        scan_score: summary.score,
-        score: summary.score,
+        scan_score: Math.round(summary.score),
+        score: Math.round(summary.score),
         critical_count: summary.issue_counts.critical,
         high_count: summary.issue_counts.high,
-        medium_count: summary.issue_counts.medium,
-        low_count: summary.issue_counts.low,
-        scan_error: null,
+  	medium_count: summary.issue_counts.medium,
+    	low_count: summary.issue_counts.low,
+    	scan_error: null,
       })
-      .eq('id', scanId);
+      .eq('id', scanId)
+      .select();
+
+    if (completeError) {
+      console.error('[COMPLETE UPDATE FAILED]:', completeError);
+    } else {
+      console.log('[COMPLETE UPDATE SUCCESS]:', completeData);
+    }
     console.log(`[SCAN] ${scanId} marked completed with score ${summary.score}`);
 
     logScanActivitySafely({

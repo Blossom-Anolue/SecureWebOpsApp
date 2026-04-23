@@ -1,6 +1,6 @@
 const CONFIG = {
-  apiBaseUrl: "http://172.20.0.220:3000",
-  appBaseUrl: "http://172.20.0.220:3000",
+  apiBaseUrl: "https://securewebops.gannon.link",
+  appBaseUrl: "https://securewebops.gannon.link",
   supabaseUrl: "https://culznwivxwtvrmohstht.supabase.co",
   supabasePublishableKey: "sb_publishable_m_7Q5T4ZLLuFsiZK7-N1xw_V7KbRTBx",
   projectId: "culznwivxwtvrmohstht",
@@ -315,15 +315,19 @@ async function queueScan(session, targetUrl) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: session?.access_token
+  	? `Bearer ${session.access_token}`
+  	: undefined,
     },
     body: JSON.stringify({
-      target_url: targetUrl,
-      scan_type: "quick",
+      url: targetUrl,
+      scanType: "quick",
+      source: "extension"
     }),
   });
 
   const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
     throw new Error(payload?.error?.message || `Scan failed with status ${response.status}`);
   }

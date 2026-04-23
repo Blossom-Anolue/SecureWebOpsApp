@@ -325,22 +325,75 @@ export function useAddDomain() {
   
   return useMutation({
     mutationFn: async ({ domain, organizationId }: { domain: string; organizationId?: string | null }) => {
+      const cleaned = domain.trim().toLowerCase();
+
+      console.log("VALIDATION RUNNING:", cleaned);
+
+      // 🔒 HARD VALIDATION (whitelist approach)
+
+      // must exist + reasonable length
+      if (!cleaned || cleaned.length > 255) {
+        throw new Error('Invalid domain');
+      }
+
+      // only allow valid domain characters
+      if (!/^[a-z0-9.-]+$/.test(cleaned)) {
+        throw new Error('Invalid domain format');
+      }
+
+      // must be a real domain (has dot + TLD)
+      if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(cleaned)) {
+        throw new Error('Invalid domain format');
+      }
+
+      // 🚫 block internal/private targets
+      if (
+        cleaned === 'localhost' ||
+        cleaned.endsWith('.local') ||
+        cleaned.startsWith('127.') ||
+        cleaned.startsWith('10.') ||
+        cleaned.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(cleaned)
+      ) {
+        throw new Error('Private/internal domains not allowed');
+      }
+
       const { data, error } = await supabase
         .from('domains')
         .insert({
-          domain,
+          domain: cleaned,
           user_id: user!.id,
           organization_id: organizationId ?? null,
           is_verified: true,
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data as Domain;
     },
     onSuccess: () => {
       // Invalidate domains cache to trigger refetch
+      queryClient.invalidateQueries({ queryKey: ['domains'] });
+    },
+  });
+}
+
+export function useDeleteDomain() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (domainId: string) => {
+      const { error } = await supabase
+        .from('domains')
+        .delete()
+        .eq('id', domainId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['domains'] });
     },
   });
@@ -366,11 +419,15 @@ export function useScans() {
         .from('scans')
         .select('*')
         .order('started_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as Scan[];
     },
-    enabled: !!user,
+
+    // Only run when user exists
+    enabled: !!user?.id,
+
+    refetchInterval: 3000,
   });
 }
 

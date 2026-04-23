@@ -172,14 +172,14 @@ export function usePendingInvites() {
         .from('organization_members')
         .select('*, organizations(id, name, slug)')
         .is('user_id', null)
-        .eq('joined_at', null)
+        .is('joined_at', null)
         .eq('invited_email', normalizedEmail)
         .order('invited_at', { ascending: false });
 
       if (error) throw error;
       return data as OrganizationMember[];
     },
-    enabled: !!user?.id && !!user?.email,
+    enabled: !!user?.email,
   });
 }
 
