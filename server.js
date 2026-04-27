@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,8 +27,7 @@ const extensionZipPath = path.join(__dirname, 'securewebops-extension.zip');
 // --- SECURITY: STRICT CORS CONFIGURATION ---
 // Only allow requests from your trusted frontend domains
 const allowedOrigins = [
-  'https://your-production-app.com', // Replace with your actual production domain
-  'https://staging.your-app.com',
+  'https://securewebops.gannon.link', // Your actual production domain
   'http://localhost:5173',
   ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [])
 ].map(url => url.trim().replace(/\/$/, ''));
@@ -40,7 +39,7 @@ app.use(cors({
     
     if (allowedOrigins.indexOf(origin) === -1) {
       console.warn(`[SECURITY] Blocked request from unauthorized CORS origin: ${origin}`);
-      return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+      return callback(null, false); // Return false instead of Error to avoid 500 HTML crashes
     }
     return callback(null, true);
   },
