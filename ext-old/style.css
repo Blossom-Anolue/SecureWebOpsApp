@@ -1,0 +1,270 @@
+:root {
+  --bg: #08111f;
+  --panel: #0f1b2f;
+  --panel-border: #1b355a;
+  --text: #eef4ff;
+  --muted: #a9b6cf;
+  --primary: #1e80ff;
+  --primary-strong: #0c63d6;
+  --secondary: #162842;
+  --success: #28c76f;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 340px;
+  background:
+    radial-gradient(circle at top, rgba(30, 128, 255, 0.18), transparent 36%),
+    linear-gradient(180deg, #0a1324 0%, var(--bg) 100%);
+  color: var(--text);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.container {
+  padding: 18px;
+}
+
+.logo {
+  width: 58px;
+  display: block;
+  margin: 0 auto 10px;
+}
+
+h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 6px 0 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.panel {
+  border: 1px solid var(--panel-border);
+  background: rgba(15, 27, 47, 0.9);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.panelText {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.infoPanel {
+  background: rgba(10, 22, 39, 0.95);
+}
+
+.mailboxStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mailboxStat {
+  border-radius: 10px;
+  background: #0a1526;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mailboxLabel {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.mailboxValue {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+input {
+  width: 100%;
+  padding: 12px 13px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid #2c4e7c;
+  background: #07101d;
+  color: var(--text);
+  outline: none;
+}
+
+input:focus {
+  border-color: #4da3ff;
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.18);
+}
+
+button {
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+#signInBtn,
+#scanBtn {
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-strong) 100%);
+  color: white;
+}
+
+.secondaryBtn {
+  margin-top: 8px;
+  background: var(--secondary);
+  color: var(--text);
+  border: 1px solid #28466f;
+}
+
+.hidden {
+  display: none;
+}
+
+.accountRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.sectionLabel {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.accountEmail {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.scoreWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.scoreRing {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: conic-gradient(var(--success) 0deg, #173456 0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s ease;
+}
+
+.scoreInner {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: #07101d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#scoreValue {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.resultMeta {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.resultTarget,
+.resultRisk {
+  margin: 0;
+}
+
+.resultTarget {
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.resultRisk {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.findingGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.findingStat {
+  border-radius: 10px;
+  background: #0a1526;
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.findingLabel {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.status {
+  min-height: 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 2px 4px 0;
+}
