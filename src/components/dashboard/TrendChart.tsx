@@ -1,16 +1,29 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface TrendChartProps {
-  data: { date: string; score: number }[];
+  data: { date: string; score: number; id?: string }[];
 }
 
 export function TrendChart({ data }: TrendChartProps) {
-  const chartData = data.map(item => ({
-    ...item,
-    dateLabel: format(new Date(item.date), 'MMM d'),
-  }));
+  const navigate = useNavigate();
+  const chartData = data
+    .map(item => ({
+      ...item,
+      timestamp: new Date(item.date).getTime(),
+    }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  const handleClick = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length > 0) {
+      const payload = state.activePayload[0].payload;
+      if (payload.id) {
+        navigate(`/scans/${payload.id}`);
+      }
+    }
+  };
 
   return (
     <Card variant="elevated" className="animate-slide-up">
@@ -20,9 +33,12 @@ export function TrendChart({ data }: TrendChartProps) {
       <CardContent>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }} onClick={handleClick} style={{ cursor: 'pointer' }}>
               <XAxis 
-                dataKey="dateLabel" 
+                type="number"
+                dataKey="timestamp" 
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(val) => format(new Date(val), 'MMM d')}
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}

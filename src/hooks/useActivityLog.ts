@@ -43,6 +43,8 @@ export type ActivityAction =
   | 'phishing.checked'    // User performed a phishing check
   | 'report.downloaded'   // User downloaded a PDF report
   | 'settings.updated'    // User updated their settings
+  | 'feedback.submitted'  // User submitted feedback
+  | 'support.request_submitted' // User submitted a support request
   | 'UPLOAD_ATTEMPT'
   | 'FILE_ENCRYPTED_STORED'
   | 'FILE_DECRYPT_SUCCESS'
@@ -64,7 +66,9 @@ export type ResourceType =
   | 'phishing_check'
   | 'report'
   | 'settings'
-  | 'file';
+  | 'file'
+  | 'feedback'
+  | 'support_request';
 
 /**
  * Represents a single activity log entry.

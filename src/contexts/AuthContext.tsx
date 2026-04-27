@@ -47,6 +47,8 @@ interface AuthContextType {
   signInWithMagicLink: (email: string) => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   verifyOTP: (email: string, token: string) => Promise<{ error: any }>;
+  /** If true, the user has clicked a recovery link but hasn't set a new password yet */
+  isAwaitingPasswordReset: boolean;
 }
 
 // ============================================================================
@@ -94,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Loading state - true until initial auth check completes */
   const [loading, setLoading] = useState(true);
   const lastProfileUserIdRef = useRef<string | null>(null);
+  const [isAwaitingPasswordReset, setIsAwaitingPasswordReset] = useState(
+    () => localStorage.getItem('awaiting_password_reset') === 'true'
+  );
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -156,6 +161,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange(async (_event, authSession) => {
       if (!mounted) return;
       try {
+        if (_event === 'PASSWORD_RECOVERY') {
+          localStorage.setItem('awaiting_password_reset', 'true');
+          setIsAwaitingPasswordReset(true);
+        } else if (_event === 'USER_UPDATED' || _event === 'SIGNED_OUT') {
+          localStorage.removeItem('awaiting_password_reset');
+          setIsAwaitingPasswordReset(false);
+        }
         await syncAuthState(authSession ?? null);
       } catch (err) {
         console.error("Auth state change error:", err);
@@ -213,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback((email: string) =>
     supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${AUTH_REDIRECT_BASE}/reset-password`,
+      redirectTo: `${AUTH_REDIRECT_BASE}/auth`,
     }), []);
 
   const signOut = useCallback(async () => {
@@ -241,8 +253,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithMagicLink,
       resetPassword,
       verifyOTP,
+      isAwaitingPasswordReset,
     }),
-    [user, session, profile, loading, signIn, signUp, signOut, signInWithMagicLink, resetPassword, verifyOTP]
+    [user, session, profile, loading, signIn, signUp, signOut, signInWithMagicLink, resetPassword, verifyOTP, isAwaitingPasswordReset]
   );
 
   return (

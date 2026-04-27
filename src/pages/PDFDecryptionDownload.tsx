@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, Share2, FileText, Lock, Trash2, Loader2, FileUp, RefreshCw, UploadCloud, Search } from 'lucide-react';
+import { Download, Share2, FileText, Lock, Trash2, Loader2, FileUp, RefreshCw, UploadCloud, Search, Eye, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import FileSharing from '@/pages/FileSharing';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,9 @@ export default function PDFDecryptionDownload() {
     const [sharingFile, setSharingFile] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isClearingAll, setIsClearingAll] = useState(false);
-    const [decryptFile, setDecryptFile] = useState<{id: string, name: string} | null>(null);
-    const [decryptEmail, setDecryptEmail] = useState('');
+    const [decryptFile, setDecryptFile] = useState<{id: string, name: string, action: 'view' | 'decrypt'} | null>(null);
     const [isRecoverOpen, setIsRecoverOpen] = useState(false);
+    const [decryptPassword, setDecryptPassword] = useState('');
     const [recoverFile, setRecoverFile] = useState<File | null>(null);
     const [isRecovering, setIsRecovering] = useState(false);
     const [isRecoverDragging, setIsRecoverDragging] = useState(false);
@@ -70,15 +70,31 @@ export default function PDFDecryptionDownload() {
         }
     }, [session?.access_token, user?.id, toast]); 
 
-    const handleDownload = async (id: string, name: string, emailStr?: string) => {
-        toast({ title: "Unlocking File", description: "Requesting decryption keys..." });
+    const handleSecureAction = async (id: string, name: string, action: 'view' | 'decrypt') => {
+        let viewWindow: Window | null = null;
+        if (action === 'view') {
+            viewWindow = window.open('', '_blank');
+            if (viewWindow) {
+                viewWindow.document.write('<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#64748b;">Decrypting secure document...</div>');
+                viewWindow.document.title = "Opening Secure Document";
+            }
+        }
+
+    if (/[<>'"]/.test(decryptPassword)) {
+        toast({ title: "Invalid Input", description: "Password contains dangerous characters.", variant: "destructive" });
+        return;
+    }
+
+        toast({ title: action === 'view' ? "Opening File" : "Unlocking File", description: "Requesting decryption keys..." });
         try {
             const { data: { session } } = await supabase.auth.getSession();
             const res = await fetch(`/api/pdf/download/${id}`, {
+                method: 'POST',
                 headers: { 
                   'Authorization': `Bearer ${session?.access_token}`,
-                  'X-User-Email': emailStr || ''
-                }
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: decryptPassword }),
             });
             
             if (!res.ok) {
@@ -86,8 +102,17 @@ export default function PDFDecryptionDownload() {
                 throw new Error(errorData.error || "Decryption failed");
             }
             
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
+            const rawBlob = await res.blob();
+            const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(pdfBlob);
+            
+            if (action === 'view') {
+                if (viewWindow) {
+                    viewWindow.location.href = url + '#toolbar=0&navpanes=0';
+                } else {
+                    window.open(url + '#toolbar=0&navpanes=0', '_blank');
+                }
+            } else {
             const a = document.createElement('a');
             a.href = url;
             let downloadName = name.replace(/\.enc$/i, '');
@@ -97,16 +122,18 @@ export default function PDFDecryptionDownload() {
             a.click();
             window.URL.revokeObjectURL(url);
             a.remove();
+            }
             
             log('FILE_DECRYPT_SUCCESS', 'file', {
                 resourceId: id,
-                details: { fileName: name, email: emailStr }
+                details: { fileName: name, email: user?.email, action }
             });
-            toast({ title: "Success", description: "File securely decrypted and downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+            toast({ title: "Success", description: action === 'view' ? "Document opened securely." : "File securely decrypted and downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
         } catch (err: any) {
+            if (viewWindow) viewWindow.close();
             log('FILE_DECRYPT_FAILURE', 'file', {
                 resourceId: id,
-                details: { fileName: name, error: err.message, email: emailStr }
+                details: { fileName: name, error: err.message, email: user?.email }
             });
             toast({ title: "Decryption Failed", description: err.message, variant: "destructive" });
         }
@@ -130,7 +157,7 @@ export default function PDFDecryptionDownload() {
             const a = document.createElement('a');
             a.href = url;
             let downloadName = name.replace(/\.enc$/i, '').replace(/\.pdf$/i, '');
-            a.download = downloadName + '_encrypted.pdf';
+            a.download = downloadName + '_encrypted.enc';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -140,7 +167,7 @@ export default function PDFDecryptionDownload() {
                 resourceId: id,
                 details: { fileName: name }
             });
-            toast({ title: "Success", description: "Raw encrypted file downloaded.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+            toast({ title: "Encrypted File Downloaded", description: "This file is locked and cannot be opened directly. Use 'Recover File' in the app to view it.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
         } catch (err: any) {
             log('FILE_DOWNLOAD_RAW_FAILURE' as any, 'file', { resourceId: id, details: { fileName: name, error: err.message } });
             toast({ title: "Download Failed", description: err.message, variant: "destructive" });
@@ -294,8 +321,9 @@ export default function PDFDecryptionDownload() {
                 throw new Error(errorData.error || "Recovery failed.");
             }
 
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
+            const rawBlob = await res.blob();
+            const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(pdfBlob);
             const a = document.createElement('a');
             a.href = url;
             
@@ -410,8 +438,9 @@ export default function PDFDecryptionDownload() {
     const renderFileGroup = (items: any[], emptyMessage: string) => {
         if (items.length === 0) {
             return (
-                <div className="rounded-b-xl border dark:border-slate-800/80 border-t-0 bg-slate-50 dark:bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                    {emptyMessage}
+                <div className="rounded-xl border border-dashed dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/20 px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                    <p>{emptyMessage}</p>
                 </div>
             );
         }
@@ -420,8 +449,8 @@ export default function PDFDecryptionDownload() {
         const anySelected = items.some(i => selectedFiles.has(i.file.id));
 
         return (
-            <div className="grid gap-4 rounded-b-xl border dark:border-slate-800/80 border-t-0 bg-white dark:bg-slate-900/30 p-4">
-                <div className="flex items-center justify-between pb-2 border-b dark:border-slate-700/50">
+            <div className="space-y-3">
+                <div className="flex items-center justify-between px-1 pb-2">
                     <label className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
                         <input 
                             type="checkbox"
@@ -439,7 +468,7 @@ export default function PDFDecryptionDownload() {
                     )}
                 </div>
                 {items.map(item => (
-                    <div key={item.file?.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border dark:border-slate-700/60 rounded-xl bg-white dark:bg-slate-900/50 shadow-sm hover:shadow-md hover:border-primary/40 dark:hover:border-primary/60 dark:hover:bg-slate-800/80 transition-all duration-300">
+                    <div key={item.file?.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-200/60 dark:border-slate-700/60 rounded-xl bg-white dark:bg-slate-900/50 shadow-sm hover:shadow-md hover:border-primary/40 dark:hover:border-primary/60 transition-all duration-300">
                         <div className="flex items-center gap-4 min-w-0">
                             <input 
                                 type="checkbox"
@@ -447,15 +476,12 @@ export default function PDFDecryptionDownload() {
                                 onChange={() => toggleFileSelection(item.file.id)}
                                 className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
                             />
-                            <div className="p-2 bg-slate-50 dark:bg-slate-800/80 dark:border dark:border-slate-700/50 rounded-lg">
-                                <FileText className="text-primary w-6 h-6" />
+                            <div className="p-2 bg-slate-50 dark:bg-slate-800/80 dark:border dark:border-slate-700/50 rounded-lg shrink-0">
+                                <FileText className="text-slate-400 dark:text-slate-500 w-6 h-6" />
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-semibold text-slate-800 dark:text-slate-100">{item.file?.file_name}</p>
-                                    <Badge variant="outline" className={item.owned ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'}>
-                                        {item.owned ? 'My File' : 'Shared With Me'}
-                                    </Badge>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{item.file?.file_name}</p>
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
@@ -471,28 +497,33 @@ export default function PDFDecryptionDownload() {
                             </div>
                         </div>
 
-                        <div className="flex gap-2">
-                            {(item.permission_level === 'VIEW' || item.permission_level === 'DOWNLOAD' || item.permission_level === 'ADMIN') && (
-                                <>
-                                    <button 
-                                        onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name})} 
-                                        className="p-2 hover:bg-primary/10 dark:hover:bg-primary/25 rounded-lg text-primary dark:text-primary transition-colors"
-                                        title="Decrypt & Download"
-                                    >
-                                        <Download size={20}/>
-                                        <span className="sr-only">Decrypt & Download</span>
-                                    </button>
-                                    {(item.permission_level === 'DOWNLOAD' || item.permission_level === 'ADMIN') && (
-                                    <button 
-                                        onClick={() => handleDownloadRaw(item.file.id, item.file.file_name)} 
-                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
-                                        title="Download Raw Encrypted File"
-                                    >
-                                        <Lock size={20}/>
-                                        <span className="sr-only">Download Raw Encrypted File</span>
-                                    </button>
-                                    )}
-                                </>
+                        <div className="flex gap-1 sm:gap-2">
+                            {(item.permission_level === 'VIEW' || item.permission_level === 'DOWNLOAD' || item.permission_level === 'DECRYPT' || item.permission_level === 'ADMIN') && (
+                                <button 
+                                    onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name, action: 'view'})} 
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                                    title="View Document"
+                                >
+                                    <Eye size={18}/>
+                                </button>
+                            )}
+                            {(item.permission_level === 'DECRYPT' || item.permission_level === 'ADMIN') && (
+                                <button 
+                                    onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name, action: 'decrypt'})} 
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                                    title="Decrypt & Download"
+                                >
+                                    <Download size={18}/>
+                                </button>
+                            )}
+                            {(item.permission_level === 'DOWNLOAD' || item.permission_level === 'DECRYPT' || item.permission_level === 'ADMIN') && (
+                                <button 
+                                    onClick={() => handleDownloadRaw(item.file.id, item.file.file_name)} 
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                                    title="Download Raw Encrypted File"
+                                >
+                                    <Lock size={18}/>
+                                </button>
                             )}
                             {item.permission_level === 'ADMIN' && (
                                 <>
@@ -501,15 +532,14 @@ export default function PDFDecryptionDownload() {
                                         className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-lg text-blue-600 dark:text-blue-400 transition-colors"
                                         title="File Sharing"
                                     >
-                                        <Share2 size={20}/>
-                                        <span className="sr-only">File Sharing</span>
+                                        <Share2 size={18}/>
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(item.file.id, item.file.file_name)} 
                                         className="p-2 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg text-red-500 dark:text-red-400 transition-colors"
                                         title="Purge File"
                                     >
-                                        <Trash2 size={20}/>
+                                        <Trash2 size={18}/>
                                     </button>
                                 </>
                             )}
@@ -519,7 +549,7 @@ export default function PDFDecryptionDownload() {
                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg text-red-500 dark:text-red-400 transition-colors"
                                 title="Remove from my vault"
                             >
-                                <Trash2 size={20}/>
+                                <Trash2 size={18}/>
                             </button>
                         )}
                         </div>
@@ -531,31 +561,6 @@ export default function PDFDecryptionDownload() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">My Vault & Sharing</h2>
-                    <p className="text-sm text-slate-500">Decrypt, share, and manage encrypted files already stored in the vault.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => setIsRecoverOpen(true)}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Recover File
-                    </Button>
-                    <Button variant="outline" onClick={() => navigate('/encrypt')}>
-                        <FileUp className="w-4 h-4 mr-2" />
-                        Encrypt New File
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={handleClearAll}
-                        disabled={isLoading || isClearingAll || adminFiles.length === 0}
-                    >
-                        {isClearingAll ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                        Clear All
-                    </Button>
-                </div>
-            </div>
-
             {isLoading ? (
                 <div className="flex justify-center p-8 text-muted-foreground">
                     <Loader2 className="w-8 h-8 animate-spin" />
@@ -572,7 +577,7 @@ export default function PDFDecryptionDownload() {
                 </div>
             ) : (
                 <Tabs defaultValue="my-files" className="w-full">
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                         <TabsList className="grid w-full sm:w-[400px] grid-cols-2 shrink-0">
                             <TabsTrigger value="my-files" className="gap-2">
                                 My Files
@@ -583,43 +588,42 @@ export default function PDFDecryptionDownload() {
                                 <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px] leading-none rounded-full">{sharedFiles.length}</Badge>
                             </TabsTrigger>
                         </TabsList>
-                        <div className="relative w-full sm:w-64 shrink-0">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input 
-                                placeholder="Search files..." 
-                                className="pl-9 bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-primary w-full"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                            <div className="relative w-full sm:w-64 shrink-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input 
+                                    placeholder="Search files..." 
+                                    className="pl-9 pr-9 bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-primary w-full"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                <Button variant="outline" size="sm" onClick={() => setIsRecoverOpen(true)} className="h-10 sm:h-9">
+                                    <RefreshCw className="w-4 h-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Recover</span>
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
                     <TabsContent value="my-files" className="mt-0">
                         <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="rounded-t-xl border dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">My Files</h3>
-                                        <p className="text-xs text-slate-500">Files you uploaded and fully manage.</p>
-                                    </div>
-                                    <Badge variant="outline" className="border-emerald-200 dark:border-emerald-800 bg-white dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400">{ownedFiles.length}</Badge>
-                                </div>
-                            </div>
                             {renderFileGroup(ownedFiles, 'You have not uploaded any encrypted files yet.')}
                         </section>
                     </TabsContent>
 
                     <TabsContent value="shared" className="mt-0">
                         <section className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="rounded-t-xl border dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/20 px-4 py-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Shared With Me</h3>
-                                        <p className="text-xs text-slate-500">Files other people have granted you access to.</p>
-                                    </div>
-                                    <Badge variant="outline" className="border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">{sharedFiles.length}</Badge>
-                                </div>
-                            </div>
                             {renderFileGroup(sharedFiles, 'Files shared with you will appear here.')}
                         </section>
                     </TabsContent>
@@ -637,25 +641,25 @@ export default function PDFDecryptionDownload() {
             <Dialog open={!!decryptFile} onOpenChange={(open) => {
                 if (!open) {
                     setDecryptFile(null);
-                    setDecryptEmail('');
+                    setDecryptPassword('');
                 }
             }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm Identity</DialogTitle>
+                        <DialogTitle>{decryptFile?.action === 'view' ? 'Authorize View' : 'Authorize Decryption'}</DialogTitle>
                         <DialogDescription>
-                            Please enter your email address to proceed with decryption. This ensures secure access tracking.
+                            Please enter your account password to authorize {decryptFile?.action === 'view' ? 'securely viewing this document' : 'decrypting and downloading this document'}. This is a security measure to ensure you are the account owner.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="decrypt-email" className="text-xs font-bold uppercase tracking-tight text-slate-500">Email Address</Label>
+                            <Label htmlFor="decrypt-password">Password</Label>
                             <Input 
-                                id="decrypt-email"
-                                type="email" 
-                                placeholder="your.email@example.com" 
-                                value={decryptEmail} 
-                                onChange={(e) => setDecryptEmail(e.target.value)} 
+                                id="decrypt-password"
+                                type="password" 
+                                placeholder="••••••••" 
+                                value={decryptPassword} 
+                                onChange={(e) => setDecryptPassword(e.target.value)} 
                                 autoFocus
                             />
                         </div>
@@ -663,29 +667,21 @@ export default function PDFDecryptionDownload() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => {
                             setDecryptFile(null);
-                            setDecryptEmail('');
+                            setDecryptPassword('');
                         }}>
                             Cancel
                         </Button>
                         <Button 
                             onClick={() => {
-                                if (decryptEmail) {
-                                    if (user?.email && decryptEmail.toLowerCase() !== user.email.toLowerCase()) {
-                                        toast({
-                                            title: "Verification Failed",
-                                            description: "The email address entered does not match your account's registered email.",
-                                            variant: "destructive"
-                                        });
-                                        return;
-                                    }
-                                    handleDownload(decryptFile!.id, decryptFile!.name, decryptEmail);
+                                if (decryptPassword) {
+                                    handleSecureAction(decryptFile!.id, decryptFile!.name, decryptFile!.action);
                                     setDecryptFile(null);
-                                    setDecryptEmail('');
+                                    setDecryptPassword('');
                                 }
                             }}
-                            disabled={!decryptEmail}
+                            disabled={!decryptPassword}
                         >
-                            Confirm & Decrypt
+                            {decryptFile?.action === 'view' ? 'Confirm & View' : 'Confirm & Decrypt'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

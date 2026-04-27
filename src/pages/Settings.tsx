@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2, AlertTriangle, Copy, ShieldCheck, Database, Settings as SettingsIcon } from 'lucide-react';
+import { Building2, Globe, Bell, Save, Plus, Trash2, Loader2, AlertTriangle, Copy, ShieldCheck, Database, Settings as SettingsIcon, UserRound, Camera, X } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,6 @@ import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotific
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Trash2 } from 'lucide-react';
 
 async function copyTextToClipboard(value: string) {
   if (!value) {
@@ -80,6 +79,11 @@ export default function Settings() {
   const addDomain = useAddDomain();
   const deleteDomain = useDeleteDomain();
 
+  const [fullName, setFullName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
   const [notifyEmail, setNotifyEmail] = useState(true);
@@ -98,6 +102,10 @@ export default function Settings() {
   // Initialize form values from fetched data
   useEffect(() => {
     if (profile) {
+      setFullName(profile.full_name || '');
+      setAvatarUrl(profile.avatar_url || null);
+      setAvatarFile(null);
+      setAvatarRemoved(false);
       setCompanyName(profile.company_name || '');
       setIndustry(profile.industry || '');
     }
@@ -112,22 +120,24 @@ export default function Settings() {
   }, [notificationSettings]);
 
   const isLoading = profileLoading || notificationsLoading || domainsLoading;
+  const normalizedFullName = fullName.trim();
   const normalizedCompanyName = companyName.trim();
   const normalizedIndustry = industry.trim();
+  const savedFullName = profile?.full_name ?? '';
   const savedCompanyName = profile?.company_name ?? '';
   const savedIndustry = profile?.industry ?? '';
   const savedNotifyEmail = notificationSettings?.email_notifications ?? true;
   const savedNotifyCritical = notificationSettings?.critical_alerts ?? true;
   const savedNotifyWeekly = notificationSettings?.weekly_summary ?? true;
 
-  const profileHasChanges = normalizedCompanyName !== savedCompanyName || normalizedIndustry !== savedIndustry;
+  const profileHasChanges = normalizedFullName !== savedFullName || normalizedCompanyName !== savedCompanyName || normalizedIndustry !== savedIndustry || avatarFile !== null || avatarRemoved;
   const notificationsHaveChanges =
     notifyEmail !== savedNotifyEmail ||
     notifyCritical !== savedNotifyCritical ||
     notifyWeekly !== savedNotifyWeekly;
   const hasChanges = profileHasChanges || notificationsHaveChanges;
-  const isSaving = updateProfile.isPending || updateNotifications.isPending;
-  const saveButtonLabel = isSaving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Saved';
+  const isSaving = updateProfile.isPending || updateNotifications.isPending || isUploadingAvatar;
+  const saveButtonLabel = isSaving ? 'Saving...' : 'Save Changes';
 
   if (isLoading) {
     return <LoadingState message="Loading settings..." />;
@@ -143,16 +153,48 @@ export default function Settings() {
       return;
     }
 
+    if (/[<>]/.test(normalizedFullName) || /[<>]/.test(normalizedCompanyName) || /[<>]/.test(normalizedIndustry)) {
+      toast({
+        title: "Invalid Input",
+        description: "Profile fields contain invalid characters (< or >).",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     const failedSections: string[] = [];
     const errorMessages: string[] = [];
 
     if (profileHasChanges) {
       try {
+        let finalAvatarUrl = profile?.avatar_url || null;
+        
+        if (avatarRemoved) {
+          finalAvatarUrl = null;
+        } else if (avatarFile) {
+          setIsUploadingAvatar(true);
+          const fileExt = avatarFile.name.split('.').pop();
+          const fileName = `${user!.id}/avatar-${Date.now()}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, avatarFile, { upsert: true });
+          if (uploadError) throw new Error("Failed to upload picture. Ensure the 'avatars' storage bucket exists.");
+
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+          finalAvatarUrl = publicUrl;
+          setIsUploadingAvatar(false);
+        }
+
         await updateProfile.mutateAsync({
+          full_name: normalizedFullName,
           company_name: normalizedCompanyName,
           industry: normalizedIndustry,
+          avatar_url: finalAvatarUrl,
         });
       } catch (error) {
+        setIsUploadingAvatar(false);
         failedSections.push('profile');
         errorMessages.push(getErrorMessage(error, 'Profile save failed.'));
       }
@@ -203,6 +245,27 @@ export default function Settings() {
   const handleAddDomain = async () => {
     if (!newDomain.trim()) return;
     
+    if (/[<>'"]/.test(newDomain)) {
+      toast({
+        title: "Invalid Input",
+        description: "Domain contains dangerous characters.",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(newDomain.trim())) {
+      toast({
+        title: "Invalid Domain",
+        description: "Please enter a valid domain name (e.g., example.com).",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     try {
       await addDomain.mutateAsync({
         domain: newDomain,
@@ -224,6 +287,25 @@ export default function Settings() {
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid file', description: 'Please upload an image file.', variant: 'destructive', className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      return;
+    }
+
+    // Optimistically update the UI with a local preview instantly
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarUrl(objectUrl);
+    setAvatarFile(file);
+    setAvatarRemoved(false);
+    
+    // Clear the input so selecting the same file again triggers onChange
+    event.target.value = '';
   };
 
   const handleDeleteAccount = async () => {
@@ -266,73 +348,102 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0 max-w-3xl">
-      {/* Enhanced Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 md:p-8 border border-primary/10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-6 pb-20 lg:pb-0 w-full max-w-5xl mx-auto animate-in fade-in duration-500">
+      {/* Page Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-transparent p-6 md:p-8 border border-slate-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="absolute -right-6 -top-6 opacity-5 pointer-events-none">
-          <SettingsIcon className="w-40 h-40 text-primary" />
+          <SettingsIcon className="w-48 h-48 text-slate-900 dark:text-white" />
         </div>
         <div className="relative z-10">
           <h1 className="text-3xl lg:text-4xl font-bold font-display text-slate-900 dark:text-white">Settings</h1>
-          <p className="text-muted-foreground mt-2 text-lg max-w-xl">
-            Manage your business profile, domains, notifications, and workspace security.
-          </p>
+          <p className="text-muted-foreground mt-2 text-lg">Manage your account preferences and workspace security.</p>
         </div>
-        <Button size="lg" onClick={handleSave} disabled={isSaving || !hasChanges} className="relative z-10 lg:min-w-[180px] shadow-md">
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {saveButtonLabel}
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              {saveButtonLabel}
-            </>
-          )}
-        </Button>
+        <div className="relative z-10 flex shrink-0">
+          <Button onClick={handleSave} disabled={isSaving || !hasChanges} size="lg" className="shadow-md min-w-[160px] text-base w-full sm:w-auto transition-all">
+            {isSaving ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5 mr-2" />
+                {saveButtonLabel}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Quick Navigation</CardTitle>
-          <CardDescription>Jump to the section you need or move directly into the product areas connected to these settings.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => document.getElementById('business-information')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            Business Information
-          </Button>
-          <Button variant="outline" onClick={() => document.getElementById('domains-websites')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            Domains & Websites
-          </Button>
-          <Button variant="outline" onClick={() => document.getElementById('notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            Notifications
-          </Button>
-          {organizations && organizations.length > 0 && (
-            <Button variant="outline" onClick={() => document.getElementById('workspace-security')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-              Workspace Security
-            </Button>
-          )}
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Back To Dashboard
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/encrypt')}>
-            Open Protected Files
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Business Info */}
-      <Card id="business-information">
+      {/* Profile Info */}
+      <Card id="profile-information">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Building2 className="w-5 h-5" />
-            Business Information
+            <UserRound className="w-5 h-5" />
+            Profile Information
           </CardTitle>
-          <CardDescription>Basic information about your business</CardDescription>
+          <CardDescription>Manage your personal and business details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-6 bg-slate-50 dark:bg-slate-900/30 p-5 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="relative h-24 w-24 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-4 border-background shadow-sm flex items-center justify-center shrink-0">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <UserRound className="h-10 w-10 text-slate-400 dark:text-slate-500" />
+              )}
+            </div>
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left space-y-3 flex-1">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{fullName || 'Your Name'}</h3>
+                <p className="text-sm text-slate-500">{user?.email}</p>
+              </div>
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <Input
+                  type="file"
+                  id="avatar-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  disabled={isUploadingAvatar}
+                />
+                <Label
+                  htmlFor="avatar-upload"
+                  className={buttonVariants({ variant: "outline", size: "sm", className: "cursor-pointer bg-white dark:bg-slate-950" })}
+                >
+                  {isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2 text-slate-500" />}
+                  Change Picture
+                </Label>
+                {avatarUrl && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    disabled={isUploadingAvatar}
+                    onClick={() => {
+                      setAvatarUrl(null); // Optimistically remove instantly
+                      setAvatarFile(null);
+                      setAvatarRemoved(true);
+                    }} 
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 px-2 h-9"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="full-name">Full Name</Label>
+              <Input
+                id="full-name"
+                placeholder="Your Full Name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="business-name">Business Name</Label>
               <Input
@@ -384,9 +495,6 @@ export default function Settings() {
                 <Copy className="h-3 w-3" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              You can securely share this ID with other administrators to grant them access to your encrypted files without exposing your email.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -402,7 +510,8 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-3">
           {domains && domains.length > 0 ? (
-            domains.map((domain) => (
+          <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
+            {domains.map((domain) => (
               <div key={domain.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
       
                 {/* LEFT SIDE */}
@@ -423,13 +532,13 @@ export default function Settings() {
 
                 {/* RIGHT SIDE */}
                 <div className="flex items-center gap-2">
-                  <Badge variant={domain.is_verified ? 'low' : 'secondary'}>
-                    {domain.is_verified ? 'Verified' : 'Pending'}
+                  <Badge variant={domain.is_verified ? 'low' : 'secondary'} title={domain.is_verified ? 'This domain is actively being monitored.' : 'This domain is pending verification.'}>
+                    {domain.is_verified ? 'Monitored' : 'Pending'}
                   </Badge>
 
                   <button
                     onClick={() => {
-                      if (confirm('Delete this domain?')) {
+                      if (window.confirm('Delete this domain?')) {
                         deleteDomain.mutate(domain.id);
                       }
                     }}
@@ -440,8 +549,9 @@ export default function Settings() {
                 </div>
 
               </div>
-            ))
-            ) : (
+            ))}
+          </div>
+          ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
               No domains added yet. Add your first domain to start monitoring.
             </p>
@@ -560,7 +670,13 @@ export default function Settings() {
                   onChange={(e) => setSiemUrl(e.target.value)}
                   className="bg-white dark:bg-slate-950"
                 />
-                <Button variant="secondary" onClick={() => toast({ title: "SIEM Configured", description: "Audit logs will be forwarded to the specified endpoint."})}>Connect</Button>
+                <Button variant="secondary" onClick={() => {
+                  if (siemUrl && !/^https?:\/\/.*/.test(siemUrl)) {
+                    toast({ title: "Invalid URL", description: "Please enter a valid HTTP/HTTPS URL.", variant: "destructive" });
+                    return;
+                  }
+                  toast({ title: "SIEM Configured", description: "Audit logs will be forwarded to the specified endpoint."})
+                }}>Connect</Button>
               </div>
             </div>
             <Separator className="bg-primary/10" />
@@ -615,7 +731,7 @@ export default function Settings() {
       </Card>
 
       {/* Danger Zone */}
-      <Card className="border-destructive/50">
+      <Card className="border-destructive/50 bg-red-50/30 dark:bg-red-950/10">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2 text-destructive">
             <AlertTriangle className="w-5 h-5" />

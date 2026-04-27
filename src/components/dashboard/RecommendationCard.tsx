@@ -1,6 +1,7 @@
-import { ArrowRight, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { ArrowRight, AlertCircle, AlertTriangle, Info, ChevronRight, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import type { Recommendation } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +19,10 @@ export function RecommendationCard({ recommendations }: RecommendationCardProps)
   return (
     <Card variant="elevated" className="animate-slide-up">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Quick Recommendations</CardTitle>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />
+          Quick Recommendations
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {recommendations.slice(0, 3).map((rec) => {
@@ -28,16 +32,24 @@ export function RecommendationCard({ recommendations }: RecommendationCardProps)
           return (
             <div 
               key={rec.id}
-              className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              className="group flex items-start gap-3 p-3 rounded-xl border border-transparent bg-muted/30 hover:bg-muted/80 hover:border-primary/20 hover:shadow-sm transition-all duration-300 cursor-pointer"
             >
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", config.bg)}>
-                <Icon className={cn("w-4 h-4", config.color)} />
+              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors", config.bg)}>
+                <Icon className={cn("w-5 h-5", config.color)} />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-sm">{rec.title}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h4 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{rec.title}</h4>
+                  <Badge variant="outline" className="text-[10px] py-0 h-4 bg-background/50 backdrop-blur-sm whitespace-nowrap">
+                    {rec.category}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                   {rec.description}
                 </p>
+              </div>
+              <div className="flex items-center justify-center pt-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                <ChevronRight className="w-4 h-4 text-primary" />
               </div>
             </div>
           );

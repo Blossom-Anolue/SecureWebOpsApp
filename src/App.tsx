@@ -3,9 +3,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 
@@ -22,7 +22,6 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const ActivityLog = lazy(() => import("@/pages/ActivityLog"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const SecureVault = lazy(() => import("./pages/SecureVault"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,19 +40,29 @@ const RouteLoader = () => (
   </div>
 );
 
+const GlobalRedirects = () => {
+  const { isAwaitingPasswordReset } = useAuth();
+  const location = useLocation();
+  if (isAwaitingPasswordReset && location.pathname !== '/auth') {
+    return <Navigate to="/auth" replace />;
+  }
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <GlobalRedirects />
             <Suspense fallback={<RouteLoader />}>
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/reset-password" element={<Navigate to="/auth" replace />} />
                 
                 {/* Protected Routes */}
                 <Route element={<ProtectedRoute />}>

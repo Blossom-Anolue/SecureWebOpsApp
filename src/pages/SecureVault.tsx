@@ -28,18 +28,18 @@ export default function SecureVault() {
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
       {/* Enhanced Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-8 shadow-2xl mb-8 border border-slate-700 dark:border-slate-800">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/20 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-cyan-500/5 to-transparent dark:from-primary/20 dark:via-cyan-500/10 dark:to-transparent p-8 shadow-sm mb-8 border border-primary/20">
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
         <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
-          <Lock className="w-48 h-48 text-white" />
+          <Lock className="w-48 h-48 text-primary" />
         </div>
         <div className="relative z-10 flex items-center gap-6">
-          <div className="p-4 bg-white/10 rounded-2xl shadow-sm border border-white/20 backdrop-blur-md hidden sm:flex">
-            <Database className="text-cyan-400 w-10 h-10" />
+          <div className="p-4 bg-white/50 dark:bg-white/5 rounded-2xl shadow-sm border border-primary/20 backdrop-blur-md hidden sm:flex">
+            <Database className="text-primary w-10 h-10" />
           </div>
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold font-display tracking-tight text-white">Protected Files</h1>
-            <p className="text-slate-300 mt-2 text-base sm:text-lg max-w-2xl">
+            <h1 className="text-3xl sm:text-4xl font-bold font-display tracking-tight text-slate-900 dark:text-white">Protected Files</h1>
+            <p className="text-slate-600 dark:text-slate-300 mt-2 text-base sm:text-lg max-w-2xl">
               Protect important files, control access, and manage shared documents in one place.
             </p>
           </div>

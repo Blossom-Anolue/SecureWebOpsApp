@@ -30,13 +30,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { SecurityScore } from '@/components/dashboard/SecurityScore';
 import { StatusCard } from '@/components/dashboard/StatusCard';
-import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
 import { SecurityTrends } from '@/components/dashboard/SecurityTrends';
 import { IndustryBenchmark } from '@/components/dashboard/IndustryBenchmark';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
-import { useScans, usePhishingChecks, useSecurityScores, useDomains, useProfile } from '@/hooks/useSecurityData';
-import { mockRecommendations } from '@/lib/mock-data';
+import { useScans, usePhishingChecks, useSecurityScores, useDomains, useProfile, useScanSchedules } from '@/hooks/useSecurityData';
 import type { SecurityScore as SecurityScoreType } from '@/types';
 import Greeting from '@/components/Greeting';
 
@@ -59,6 +57,7 @@ export default function Dashboard() {
   const { data: securityScores, isLoading: scoresLoading } = useSecurityScores();
   const { data: domains, isLoading: domainsLoading } = useDomains();
   const { data: profile } = useProfile();
+  const { data: scanSchedules, isLoading: schedulesLoading } = useScanSchedules();
 
   // Vault stats
   const [vaultFileCount, setVaultFileCount] = useState<number>(0);
@@ -126,7 +125,7 @@ export default function Dashboard() {
   }, [user?.id]);
 
   // Combine loading states
-  const isLoading = scansLoading || phishingLoading || scoresLoading || domainsLoading;
+  const isLoading = scansLoading || phishingLoading || scoresLoading || domainsLoading || schedulesLoading;
 
   // Show loading state while data is being fetched
   if (isLoading) {
@@ -167,10 +166,23 @@ export default function Dashboard() {
   // Count high-risk phishing attempts (for warning display)
   const recentHighRiskPhishing = phishingChecks?.filter(p => p.risk_level === 'high').length || 0;
 
+  // Build trend data from securityScores, fallback to completedScans if security_scores table is empty
+  let trendData = securityScores?.map(s => ({ date: s.recorded_at, score: s.score, id: (s as any).scan_id })) || [];
+  if (trendData.length === 0 && completedScans.length > 0) {
+    trendData = [...completedScans]
+      .filter(s => s.score !== null)
+      .sort((a, b) => new Date(a.started_at || a.created_at || 0).getTime() - new Date(b.started_at || b.created_at || 0).getTime())
+      .map(s => ({
+        date: s.completed_at || s.started_at || s.created_at || new Date().toISOString(),
+        score: s.score!,
+        id: s.id
+      }));
+  }
+
   // Calculate current security score
   // Priority: latest recorded score > latest scan score > 0
-  const latestScore = securityScores?.[securityScores.length - 1]?.score ?? latestScan?.score ?? 0;
-  const previousScore = securityScores?.[securityScores.length - 2]?.score ?? 0;
+  const latestScore = trendData.length > 0 ? trendData[trendData.length - 1].score : (latestScan?.score ?? 0);
+  const previousScore = trendData.length > 1 ? trendData[trendData.length - 2].score : 0;
   
   // Determine security tier based on score
   // - 80+: OK (green)
@@ -178,14 +190,19 @@ export default function Dashboard() {
   // - <50: Critical (red)
   const tier = latestScore >= 80 ? 'ok' : latestScore >= 50 ? 'at-risk' : 'critical';
   
+  // Find the earliest next_run_at from active schedules
+  const nextScanSchedule = scanSchedules
+    ?.filter(s => s.is_active && s.next_run_at)
+    .sort((a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime())[0];
+
   // Prepare data object for SecurityScore component
   const securityData: SecurityScoreType = {
     current: latestScore,
     previous: previousScore,
     tier,
     lastScanDate: latestScan?.completed_at || new Date().toISOString(),
-    nextScanDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-    trend: securityScores?.map(s => ({ date: s.recorded_at, score: s.score })) || [],
+    nextScanDate: nextScanSchedule?.next_run_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // next scheduled or 7 days from now
+    trend: trendData as any,
   };
 
   // ============================================================================
@@ -340,9 +357,24 @@ export default function Dashboard() {
           summaryColor={latestScan?.critical_count ? 'danger' : latestScan?.high_count ? 'warning' : 'success'}
           primaryAction={{ 
             label: latestScan ? 'View Issues' : 'Run Scan', 
-            onClick: () => navigate(latestScan ? `/scans/${latestScan.id}` : '/scans/new') 
+            onClick: () => {
+              navigate(latestScan ? `/scans/${latestScan.id}` : '/scans/new');
+              setTimeout(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+              }, 50);
+            }
           }}
-          secondaryAction={latestScan ? { label: 'Run Scan', onClick: () => navigate('/scans/new') } : undefined}
+          secondaryAction={latestScan ? { 
+            label: 'Run Scan', 
+            onClick: () => {
+              navigate('/scans/new');
+              setTimeout(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+              }, 50);
+            }
+          } : undefined}
         />
         
         {/* Phishing & Email Card */}
@@ -370,14 +402,11 @@ export default function Dashboard() {
       </div>
 
       {/* ================================================================== */}
-      {/* RECOMMENDATIONS & TRENDS - Action items and history */}
+      {/* TRENDS - Security score history */}
       {/* ================================================================== */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Top recommendations to improve security */}
-        <RecommendationCard recommendations={mockRecommendations} />
-        
+      <div className="grid gap-4">
         {/* Security score trend chart or placeholder */}
-        {securityData.trend.length > 0 ? (
+        {securityData.trend.length > 1 ? (
           <SecurityTrends data={securityData.trend} />
         ) : (
           <div className="bg-card rounded-xl border shadow-card p-6 flex items-center justify-center">

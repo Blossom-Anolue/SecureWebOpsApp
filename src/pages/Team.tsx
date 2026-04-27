@@ -117,6 +117,16 @@ export default function Team() {
   const handleCreateOrg = async () => {
     if (!newOrgName.trim()) return;
     
+    if (/[<>]/.test(newOrgName)) {
+      toast({
+        title: "Invalid Input",
+        description: "Team name contains invalid characters (< or >).",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     const slug = newOrgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     
     try {
@@ -151,6 +161,16 @@ export default function Team() {
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !selectedOrg) return;
     
+    if (/[<>]/.test(inviteEmail)) {
+      toast({
+        title: "Invalid Input",
+        description: "Email contains invalid characters (< or >).",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     try {
       await inviteMember.mutateAsync({
         organizationId: selectedOrg.id,

@@ -21,7 +21,9 @@ import {
   ShieldAlert,
   FileUp,
   X,
-  Search
+  Search,
+  MessageSquarePlus,
+  LifeBuoy
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +84,8 @@ const ACTION_CONFIG: Record<string, { icon: typeof Activity; label: string; colo
   'report.downloaded': { icon: FileText, label: 'Report Downloaded', color: 'text-muted-foreground', iconBg: 'bg-muted', border: 'border-muted' },
   'settings.updated': { icon: Settings, label: 'Settings Updated', color: 'text-muted-foreground', iconBg: 'bg-muted', border: 'border-muted' },
   'UPLOAD_ATTEMPT': { icon: FileUp, label: 'Vault Upload Attempt', color: 'text-muted-foreground', iconBg: 'bg-muted', border: 'border-muted' },
+  'feedback.submitted': { icon: MessageSquarePlus, label: 'Feedback Submitted', color: 'text-amber-500', iconBg: 'bg-amber-500/10', border: 'border-amber-500' },
+  'support.request_submitted': { icon: LifeBuoy, label: 'Support Request', color: 'text-blue-500', iconBg: 'bg-blue-500/10', border: 'border-blue-500' },
 };
 
 // Safe date formatter to prevent React crashing on invalid timestamps
@@ -101,12 +105,12 @@ export default function ActivityLogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hiddenLogIds, setHiddenLogIds] = useState<Set<string>>(new Set());
   const [decryptLog, setDecryptLog] = useState<{id: string, fileId: string, fileName: string} | null>(null);
-  const [decryptEmail, setDecryptEmail] = useState('');
   const [selectedLogs, setSelectedLogs] = useState<Set<string>>(new Set());
+  const [decryptPassword, setDecryptPassword] = useState('');
   const [isBulkClearing, setIsBulkClearing] = useState(false);
   const { toast } = useToast();
   
-  const { data: logs, isLoading } = useActivityLogs(selectedOrgId, 100);
+  const { data: logs, isLoading } = useActivityLogs(selectedOrgId, 500);
 
   const hiddenStorageKey = useMemo(() => {
     return user?.id ? `securewebops.activity.hidden.${user.id}` : null;
@@ -160,25 +164,6 @@ export default function ActivityLogPage() {
     
     return true;
   });
-
-  const handleClearAll = async () => {
-    if (!filteredLogs?.length) return;
-    if (!confirm('Are you sure you want to clear the currently visible activity logs from your page?')) return;
-
-    setActionLoading('clear-all');
-    try {
-      const nextIds = new Set(hiddenLogIds);
-      for (const log of filteredLogs) {
-        nextIds.add(log.id);
-      }
-      persistHiddenLogIds(nextIds);
-      toast({ title: 'Success', description: 'Activity logs cleared from your page.', className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
-    } catch (error) {
-      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to clear activity logs.', variant: 'destructive', className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   const handleClearSingle = async (id: string) => {
     setActionLoading(`clear-${id}`);
@@ -281,10 +266,6 @@ export default function ActivityLogPage() {
           </div>
         </div>
         <div className="relative z-10 flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleClearAll} disabled={!filteredLogs?.length || actionLoading === 'clear-all'}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            {actionLoading === 'clear-all' ? 'Clearing...' : 'Clear All'}
-          </Button>
           <Button variant="outline" onClick={exportToCSV} disabled={!filteredLogs?.length}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -300,10 +281,19 @@ export default function ActivityLogPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input 
                 placeholder="Search activity..." 
-                className="pl-9 bg-white dark:bg-slate-950 dark:border-slate-800 w-full"
+                className="pl-9 pr-9 bg-white dark:bg-slate-950 dark:border-slate-800 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
               <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -320,6 +310,8 @@ export default function ActivityLogPage() {
                   <SelectItem value="member.role_changed">Role Changes</SelectItem>
                   <SelectItem value="phishing.checked">Phishing Checks</SelectItem>
                   <SelectItem value="settings.updated">Settings Updates</SelectItem>
+                  <SelectItem value="feedback.submitted">Feedback Submitted</SelectItem>
+                  <SelectItem value="support.request_submitted">Support Requests</SelectItem>
                   <SelectItem value="FILE_ENCRYPTED_STORED">Vault Encryptions</SelectItem>
                   <SelectItem value="FILE_DECRYPT_SUCCESS">Vault Decryptions</SelectItem>
                   <SelectItem value="FILE_DOWNLOAD_RAW">Raw File Downloads</SelectItem>
@@ -489,25 +481,25 @@ export default function ActivityLogPage() {
       <Dialog open={!!decryptLog} onOpenChange={(open) => {
         if (!open) {
           setDecryptLog(null);
-          setDecryptEmail('');
+          setDecryptPassword('');
         }
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Identity</DialogTitle>
             <DialogDescription>
-              Please enter your email address to proceed with decryption. This ensures secure access tracking.
+              Please enter your account password to authorize decryption. This is a security measure to ensure you are the account owner.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="decrypt-email" className="text-xs font-bold uppercase tracking-tight text-slate-500">Email Address</Label>
+              <Label htmlFor="decrypt-password">Password</Label>
               <Input 
-                id="decrypt-email"
-                type="email" 
-                placeholder="your.email@example.com" 
-                value={decryptEmail} 
-                onChange={(e) => setDecryptEmail(e.target.value)} 
+                id="decrypt-password"
+                type="password" 
+                placeholder="••••••••" 
+                value={decryptPassword} 
+                onChange={(e) => setDecryptPassword(e.target.value)} 
                 autoFocus
               />
             </div>
@@ -515,22 +507,33 @@ export default function ActivityLogPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setDecryptLog(null);
-              setDecryptEmail('');
+              setDecryptPassword('');
             }}>
               Cancel
             </Button>
             <Button 
               onClick={async () => {
-                if (!decryptEmail || !decryptLog) return;
+                if (!decryptPassword || !decryptLog) return;
                 const { id, fileId, fileName } = decryptLog;
+                
+                if (/[<>'"]/.test(decryptPassword)) {
+                  toast({ title: "Invalid Input", description: "Password contains dangerous characters.", variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+                  return;
+                }
+
                 setDecryptLog(null);
-                setDecryptEmail('');
+                setDecryptPassword('');
                 try {
                   setActionLoading(`download-${id}`);
                   const { data: { session } } = await supabase.auth.getSession();
                   if (!session) throw new Error("Authentication session not found.");
                   const res = await fetch(`/api/pdf/download/${fileId}`, {
-                    headers: { 'Authorization': `Bearer ${session.access_token}` }
+                    method: 'POST',
+                    headers: { 
+                      'Authorization': `Bearer ${session.access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: decryptPassword }),
                   });
                   if (!res.ok) throw new Error(await res.text());
                   const blob = await res.blob();
@@ -548,7 +551,7 @@ export default function ActivityLogPage() {
                   setActionLoading(null);
                 }
               }}
-              disabled={!decryptEmail}
+              disabled={!decryptPassword}
             >
               Confirm & Decrypt
             </Button>
