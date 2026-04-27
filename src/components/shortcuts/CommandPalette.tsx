@@ -16,7 +16,6 @@ import {
   Mail,
   GraduationCap,
   Settings,
-  Users,
   Activity,
   Plus,
   History,
@@ -84,10 +83,6 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             <GraduationCap className="mr-2 h-4 w-4" />
             <span>Training</span>
             <CommandShortcut>⌘T</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate('/team'))}>
-            <Users className="mr-2 h-4 w-4" />
-            <span>Team</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => navigate('/activity'))}>
             <Activity className="mr-2 h-4 w-4" />

@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ScanScheduleCard } from '@/components/settings/ScanScheduleCard';
-import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain } from '@/hooks/useSecurityData';
+import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotificationSettings, useDomains, useAddDomain, useDeleteDomain } from '@/hooks/useSecurityData';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,6 +77,7 @@ export default function Settings() {
   const updateProfile = useUpdateProfile();
   const updateNotifications = useUpdateNotificationSettings();
   const addDomain = useAddDomain();
+  const deleteDomain = useDeleteDomain();
 
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -512,6 +513,8 @@ export default function Settings() {
           <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
             {domains.map((domain) => (
               <div key={domain.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
+      
+                {/* LEFT SIDE */}
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{domain.domain}</p>
@@ -521,13 +524,30 @@ export default function Settings() {
                       <Badge variant="secondary" className="text-xs">Personal</Badge>
                     )}
                   </div>
+
                   <p className="text-xs text-muted-foreground">
-                    Added {new Date(domain.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    Added {new Date(domain.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Badge variant={domain.is_verified ? 'low' : 'secondary'} title={domain.is_verified ? 'This domain is actively being monitored.' : 'This domain is pending verification.'}>
-                  {domain.is_verified ? 'Monitored' : 'Pending'}
-                </Badge>
+
+                {/* RIGHT SIDE */}
+                <div className="flex items-center gap-2">
+                  <Badge variant={domain.is_verified ? 'low' : 'secondary'} title={domain.is_verified ? 'This domain is actively being monitored.' : 'This domain is pending verification.'}>
+                    {domain.is_verified ? 'Monitored' : 'Pending'}
+                  </Badge>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete this domain?')) {
+                        deleteDomain.mutate(domain.id);
+                      }
+                    }}
+                    className="text-red-500 hover:text-red-700 flex items-center justify-center"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
               </div>
             ))}
           </div>
@@ -535,7 +555,7 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground text-center py-4">
               No domains added yet. Add your first domain to start monitoring.
             </p>
-          )}
+          )} 
           
           <Dialog open={isAddDomainOpen} onOpenChange={setIsAddDomainOpen}>
             <DialogTrigger asChild>

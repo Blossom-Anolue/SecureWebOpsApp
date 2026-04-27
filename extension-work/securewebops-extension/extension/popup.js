@@ -1,6 +1,6 @@
 const CONFIG = {
-  apiBaseUrl: "http://172.20.0.220:3000",
-  appBaseUrl: "http://172.20.0.220:3000",
+  apiBaseUrl: "https://securewebops.gannon.link",
+  appBaseUrl: "https://securewebops.gannon.link",
   supabaseUrl: "https://culznwivxwtvrmohstht.supabase.co",
   supabasePublishableKey: "sb_publishable_m_7Q5T4ZLLuFsiZK7-N1xw_V7KbRTBx",
   projectId: "culznwivxwtvrmohstht",
@@ -315,15 +315,19 @@ async function queueScan(session, targetUrl) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: session?.access_token
+  	? `Bearer ${session.access_token}`
+  	: undefined,
     },
     body: JSON.stringify({
-      target_url: targetUrl,
-      scan_type: "quick",
+      url: targetUrl,
+      scanType: "quick",
+      source: "extension"
     }),
   });
 
   const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
     throw new Error(payload?.error?.message || `Scan failed with status ${response.status}`);
   }
@@ -402,6 +406,7 @@ async function pollForResults(session, scanId, targetUrl) {
 
 async function handleScan() {
   const targetUrl = normalizeUrl(dom.urlInput.value);
+
   if (!targetUrl) {
     setStatus("Enter a valid URL.");
     return;
@@ -415,17 +420,81 @@ async function handleScan() {
   }
 
   dom.scanBtn.disabled = true;
-  setStatus("Queueing scan...");
+  setStatus("Submitting scan...");
 
   try {
-    const queued = await queueScan(session, targetUrl);
-    const scanId = queued.scanId || queued.scan_id;
-    await setStorageValue(STORAGE_KEYS.lastScanId, scanId);
-    await callExtensionEventApi(session, "extension.scan_queued", { scanId, targetUrl, scanType: "quick" });
-    setStatus("Scan queued. Waiting for results...");
-    await pollForResults(session, scanId, targetUrl);
+    // Get SecureWebOps tab
+    const tabs = await chrome.tabs.query({
+      url: "https://securewebops.gannon.link/*"
+    });
+
+    if (!tabs || tabs.length === 0) {
+      throw new Error("Open SecureWebOps and log in first.");
+    }
+
+    const tab = tabs[0];
+
+    // Get Supabase token from the page
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (projectId) => {
+        const raw = window.localStorage.getItem(`sb-${projectId}-auth-token`);
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          return parsed?.access_token || null;
+        } catch {
+          return null;
+        }
+      },
+      args: ["culznwivxwtvrmohstht"]
+    });
+
+    const token = results?.[0]?.result;
+
+    if (!token) {
+      throw new Error("Not logged in. Please log in to SecureWebOps.");
+    }
+
+    // 🔥 YOUR WORKING BACKEND CALL
+    const response = await fetch("http://172.20.0.220:3000/api/scan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        url: targetUrl,
+        scanType: "quick",
+        source: "extension"
+      })
+    });
+
+    const raw = await response.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { raw };
+    }
+
+    if (!(response.status === 200 || response.status === 202)) {
+      throw new Error(data?.error || data?.raw || "Scan failed");
+    }
+
+    const scanId = data?.scanId || data?.scan_id;
+
+    await chrome.storage.local.set({ lastSubmittedScanId: scanId });
+
+    if (scanId) {
+      setStatus(`Scan submitted. ID: ${scanId}`);
+    } else {
+      setStatus("Scan submitted.");
+    }
+
   } catch (error) {
-    setStatus(error?.message || "Scan failed.");
+    console.error(error);
+    setStatus(error.message || "Scan failed.");
   } finally {
     dom.scanBtn.disabled = false;
   }

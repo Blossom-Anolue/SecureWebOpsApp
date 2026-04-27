@@ -5,6 +5,33 @@ import { checkRateLimit, createAndStartScan, diagnoseZapConnection, processDueSc
 const router = express.Router();
 export const publicScanRouter = express.Router();
 
+function validateDomainInput(input) {
+  if (!input) throw new Error("Invalid domain");
+
+  // Block script injection
+  if (
+    input.includes("<") ||
+    input.includes(">") ||
+    input.toLowerCase().includes("script") ||
+    input.includes("javascript:")
+  ) {
+    throw new Error("Malicious input detected");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(input.startsWith("http") ? input : `https://${input}`);
+  } catch {
+    throw new Error("Malformed domain");
+  }
+
+  if (!parsed.hostname.includes(".")) {
+    throw new Error("Invalid domain format");
+  }
+
+  return parsed;
+}
+
 function jsonError(res, status, code, message, details = undefined) {
   return res.status(status).json({
     error: {
@@ -151,10 +178,19 @@ router.post('/trigger', async (req, res) => {
   const { scanId, url, domain } = req.body ?? {};
   const rawTarget = String(url || domain || '').trim();
 
+  // 🔐 INPUT VALIDATION
+
+  let parsedUrl;
+  try {
+    parsedUrl = validateDomainInput(rawTarget);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
   console.log('[TRIGGER] incoming:', { scanId, url, domain, rawTarget });
 
-  if (!scanId || !rawTarget) {
-    return res.status(400).json({ error: 'scanId and url are required' });
+  if (!scanId) {
+    return res.status(400).json({ error: 'scanId is required' });
   }
 
   if (!checkRateLimit(getClientIp(req))) {
@@ -174,15 +210,11 @@ router.post('/trigger', async (req, res) => {
   const normalizedTarget = rawTarget.startsWith('http://') || rawTarget.startsWith('https://')
     ? rawTarget
     : `https://${rawTarget}`;
-  
+
   console.log('[TRIGGER] normalizedTarget:', normalizedTarget);
 
   try {
-    console.log('[TRIGGER] validating target...');
     const validatedTarget = await validateTargetUrl(normalizedTarget);
-    console.log('[TRIGGER] validatedTarget:', validatedTarget);
-
-    console.log('[TRIGGER] updating scan to queued:', scanId);
 
     await supabaseAdmin
       .from('scans')
@@ -200,7 +232,9 @@ router.post('/trigger', async (req, res) => {
 
     return res.status(202).json({ scan_id: scanId, status: 'queued' });
   } catch (error) {
-    return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid target' });
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Invalid target'
+    });
   }
 });
 
@@ -215,27 +249,39 @@ router.post('/v1/scans', async (req, res) => {
   }
 
   const { target, org_id, scan_type } = req.body ?? {};
-  if (!target) {
-    return res.status(400).json({ error: 'Missing target' });
+
+  // 🔐 VALIDATION
+  let parsedUrl;
+  try {
+    parsedUrl = validateDomainInput(target);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 
+  // 🔐 ACCESS CHECK
   const organizationAccess = await ensureOrganizationAccess(authResult.user.id, org_id ?? null);
   if (!organizationAccess.ok) {
     return jsonError(res, organizationAccess.status, organizationAccess.code, organizationAccess.message);
   }
 
+  // 🚀 SCAN EXECUTION
   try {
     const result = await createAndStartScan({
-      target,
+      target: parsedUrl.toString(),
       requestedByUser: authResult.user.id,
       organizationId: org_id ?? null,
       scanType: scan_type === 'full' ? 'full' : 'quick',
     });
 
-    return res.status(201).json({ scan_id: result.scanId, status: result.status });
+    return res.status(201).json({
+      scan_id: result.scanId,
+      status: result.status,
+    });
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error creating scan';
     const status = /Invalid|blocked|allowlist|private/.test(message) ? 400 : 500;
+
     return res.status(status).json({ error: message });
   }
 });

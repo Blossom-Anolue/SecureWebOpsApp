@@ -19,7 +19,6 @@ const PhishingCheck = lazy(() => import("@/pages/PhishingCheck"));
 const PhishingHistory = lazy(() => import("@/pages/PhishingHistory"));
 const Training = lazy(() => import("@/pages/Training"));
 const Settings = lazy(() => import("@/pages/Settings"));
-const Team = lazy(() => import("@/pages/Team"));
 const ActivityLog = lazy(() => import("@/pages/ActivityLog"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const SecureVault = lazy(() => import("./pages/SecureVault"));
@@ -78,7 +77,6 @@ const App = () => (
                     <Route path="/training" element={<Training />} />
                     <Route path="/training/lessons" element={<Training />} />
                     <Route path="/training/simulations" element={<Training />} />
-                    <Route path="/team" element={<Team />} />
                     <Route path="/activity" element={<ActivityLog />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/encrypt" element={<SecureVault />} />

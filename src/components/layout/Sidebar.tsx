@@ -6,7 +6,6 @@ import {
   Mail, 
   GraduationCap, 
   Settings,
-  Users,
   Activity,
   X,
   HelpCircle,
@@ -18,11 +17,8 @@ import {
 import { KeyboardShortcutsDialog } from '@/components/shortcuts/KeyboardShortcutsDialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { TeamPresence } from '@/components/presence/TeamPresence';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -37,7 +33,6 @@ const navItems = [
   { to: '/phishing', icon: Mail, label: 'Phishing Check' },
   { to: '/encrypt', icon: Lock, label: 'Protected Files' },
   { to: '/training', icon: GraduationCap, label: 'Training' },
-  { to: '/team', icon: Users, label: 'Team' },
   { to: '/activity', icon: Activity, label: 'Activity Log' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
@@ -45,10 +40,6 @@ const navItems = [
 export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: SidebarProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const { data: organizations } = useOrganizations();
-  const { data: pendingInvites } = usePendingInvites();
-  const primaryOrg = organizations?.[0];
-  const pendingInviteCount = pendingInvites?.length ?? 0;
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -126,26 +117,14 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                   )
                 }
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="flex-1">{item.label}</span>
-                {item.to === '/team' && pendingInviteCount > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
-                    {pendingInviteCount}
-                  </Badge>
-                )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="flex-1">{item.label}</span>
               </NavLink>
             </li>
           ))}
         </ul>
       </nav>
-
-      {/* Team Presence */}
-      {primaryOrg && (
-        <div className="px-3 py-2 border-t border-sidebar-border">
-          <TeamPresence organizationId={primaryOrg.id} />
-        </div>
-      )}
 
       {/* User Section */}
       <div className="p-3 border-t border-sidebar-border">
