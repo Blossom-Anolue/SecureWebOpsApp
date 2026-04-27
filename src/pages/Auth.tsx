@@ -22,7 +22,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { validatePassword } from "@/utils/passwordValidator";
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,6 +87,8 @@ export default function Auth() {
   const [showMagicLinkSent, setShowMagicLinkSent] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
 
   const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -122,6 +123,19 @@ export default function Auth() {
       return () => clearInterval(interval);
     }
   }, [timer]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (lockoutTimer > 0) {
+      interval = setInterval(() => {
+        setLockoutTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (lockoutTimer === 0 && failedAttempts >= 3) {
+      // Reset attempts after the cooldown finishes
+      setFailedAttempts(0);
+    }
+    return () => clearInterval(interval);
+  }, [lockoutTimer, failedAttempts]);
 
   useEffect(() => {
     const checkUsername = async () => {
@@ -258,6 +272,17 @@ export default function Auth() {
    */
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (lockoutTimer > 0) {
+      toast({
+        title: "Account locked",
+        description: `Too many failed attempts. Please try again in ${Math.ceil(lockoutTimer / 60)} minutes.`,
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     if (!validateForm('signin')) return;
 
     setIsSubmitting(true);
@@ -265,11 +290,21 @@ export default function Auth() {
     setIsSubmitting(false);
 
     if (error) {
-      // Handle specific error cases with user-friendly messages
-      if (error.message.includes('Invalid login credentials')) {
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      
+      if (newAttempts >= 3) {
+        setLockoutTimer(900); // Lock them out for 15 minutes (900 seconds)
+        toast({
+          title: "Account temporarily locked",
+          description: "You have entered an incorrect password 3 times. Please wait 15 minutes.",
+          variant: "destructive",
+          className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+        });
+      } else if (error.message.includes('Invalid login credentials')) {
         toast({
           title: 'Login failed',
-          description: 'Invalid email or password. Please try again.',
+          description: `Invalid email or password. ${3 - newAttempts} attempt(s) remaining.`,
           variant: 'destructive',
           className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
         });
@@ -282,6 +317,7 @@ export default function Auth() {
         });
       }
     } else {
+      setFailedAttempts(0);
       toast({
         title: 'Welcome back!',
         description: 'You have successfully signed in.',
@@ -306,20 +342,6 @@ export default function Auth() {
       companyName,
       jobRole
     };
-
-    const passwordErrors = validatePassword(password);
-
-    if (passwordErrors.length > 0) {
-      toast({
-        title: "Weak Password",
-        description: passwordErrors.join(", "),
-        variant: "destructive",
-        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
     const { error } = await signUp(email, password, sanitizedData);
     setIsSubmitting(false);
 
@@ -458,13 +480,7 @@ export default function Auth() {
                   {timer > 0 ? (
                     <span className="text-[10px] text-muted-foreground italic">Resend available in {timer}s</span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleRequestOTP}
-                      className="text-[10px] text-primary font-bold hover:underline"
-                    >
-                      Resend
-                    </button>
+                    <button type="button" onClick={handleRequestOTP} className="text-[10px] text-primary font-bold hover:underline">Resend Link</button>
                   )}
                 </div>
                 <Button
@@ -553,8 +569,10 @@ export default function Auth() {
                   </div>
 
                   {/* Submit button */}
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? (
+                  <Button type="submit" className="w-full" disabled={isSubmitting || lockoutTimer > 0}>
+                    {lockoutTimer > 0 ? (
+                      `Try again in ${Math.floor(lockoutTimer / 60)}m ${lockoutTimer % 60}s`
+                    ) : isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Signing in...
@@ -613,210 +631,183 @@ export default function Auth() {
                     {errors.accountType && <p className="text-xs text-destructive">{errors.accountType}</p>}
                   </div>
 
-                    <div>
-                      {/* Full Name */}
+                  {accountType && (
+                    <>
                       <div className="space-y-2">
                         <Label htmlFor="signup-full-name">Your Name</Label>
+                    <div className="relative">
+                      <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-full-name"
+                        type="text"
+                        placeholder="Jane Doe"
+                        className="pl-10"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                      />
+                    </div>
+                    {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-username">Username</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-username"
+                        type="text"
+                        placeholder="johndoe"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                      <div className="absolute right-3 top-2.5">
+                        {isValidating ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : isUsernameAvailable === true ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : isUsernameAvailable === false ? <XCircle className="w-4 h-4 text-destructive" /> : null}
+                      </div>
+                    </div>
+                    {errors.username && <p className="text-xs text-destructive">{errors.username}</p>}
+                  </div>
+
+                  {accountType === 'company' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-company-name">Company Name</Label>
                         <div className="relative">
-                          <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
-                            id="signup-full-name"
+                            id="signup-company-name"
                             type="text"
-                            placeholder="John Doe"
+                            placeholder="Acme Inc."
                             className="pl-10"
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
                           />
                         </div>
-                        {errors.fullName && (
-                          <p className="text-xs text-destructive">{errors.fullName}</p>
-                        )}
+                        {errors.companyName && <p className="text-xs text-destructive">{errors.companyName}</p>}
+                        <p className="text-xs text-muted-foreground">
+                          This will be the name of your company workspace.
+                        </p>
                       </div>
 
-                      {/* Username */}
                       <div className="space-y-2">
-                        <Label htmlFor="signup-username">Username</Label>
+                        <Label htmlFor="signup-job-role">Job Role</Label>
                         <div className="relative">
+                          <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
-                            id="signup-username"
+                            id="signup-job-role"
                             type="text"
-                            placeholder="johndoe"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                          />
-                          <div className="absolute right-3 top-2.5">
-                            {isValidating ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                            ) : isUsernameAvailable === true ? (
-                              <span className="text-green-500 text-xs">✓</span>
-                            ) : isUsernameAvailable === false ? (
-                              <span className="text-red-500 text-xs">✗</span>
-                            ) : null}
-                          </div>
-                        </div>
-                        {errors.username && (
-                          <p className="text-xs text-destructive">{errors.username}</p>
-                        )}
-                      </div>
-
-                      {/* Company-only fields */}
-                      {accountType === 'company' && (
-                        <div>
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-company-name">Company Name</Label>
-                            <div className="relative">
-                              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                id="signup-company-name"
-                                type="text"
-                                placeholder="Acme Inc."
-                                className="pl-10"
-                                value={companyName}
-                                onChange={(e) => setCompanyName(e.target.value)}
-                              />
-                            </div>
-                            {errors.companyName && (
-                              <p className="text-xs text-destructive">{errors.companyName}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              This will be the name of your company workspace.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-job-role">Job Role</Label>
-                            <div className="relative">
-                              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                id="signup-job-role"
-                                type="text"
-                                placeholder="e.g. Developer (optional)"
-                                className="pl-10"
-                                value={jobRole}
-                                onChange={(e) => setJobRole(e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Email */}
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-email">Email</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="signup-email"
-                            type="email"
-                            placeholder="you@company.com"
+                            placeholder="e.g. Developer (optional)"
                             className="pl-10"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            value={jobRole}
+                            onChange={(e) => setJobRole(e.target.value)}
                           />
                         </div>
-                        {errors.email && (
-                          <p className="text-xs text-destructive">{errors.email}</p>
-                        )}
                       </div>
+                    </>
+                  )}
 
-                      {/* Password */}
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-password">Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="signup-password"
-                            type={showPassword ? "text" : "password"}
-                            className="pl-10 pr-10"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                          />
-                        </div>
+                  {/* Email field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        placeholder="you@company.com"
+                        className="pl-10"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                    </div>
+                    {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                  </div>
 
-                        {errors.password && (
-                          <p className="text-xs text-destructive">{errors.password}</p>
-                        )}
-
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <p>Password must include:</p>
-                          <ul className="space-y-1">
-                            <li className={password.length >= 10 ? "text-green-500" : "text-red-500"}>
-                              {password.length >= 10 ? "✓" : "✗"} At least 10 characters
-                            </li>
-
-                            <li className={/[A-Z]/.test(password) ? "text-green-500" : "text-red-500"}>
-                              {/[A-Z]/.test(password) ? "✓" : "✗"} At least one uppercase letter
-                            </li>
-
-                            <li className={/[a-z]/.test(password) ? "text-green-500" : "text-red-500"}>
-                              {/[a-z]/.test(password) ? "✓" : "✗"} At least one lowercase letter
-                            </li>
-
-                            <li className={/[0-9]/.test(password) ? "text-green-500" : "text-red-500"}>
-                              {/[0-9]/.test(password) ? "✓" : "✗"} At least one number
-                            </li>
-
-                            <li className={/[^A-Za-z0-9]/.test(password) ? "text-green-500" : "text-red-500"}>
-                              {/[^A-Za-z0-9]/.test(password) ? "✓" : "✗"} At least one special character
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      {/* Confirm Password */}
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="signup-confirm-password"
-                            type={showConfirmPassword ? "text" : "password"}
-                            className="pl-10 pr-10"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                          />
-                        </div>
-                        {errors.confirmPassword && (
-                          <p className="text-xs text-destructive">
-                            {errors.confirmPassword}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Submit */}
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={
-                          isSubmitting || isUsernameAvailable === false || isValidating
-                        }
+                  {/* Password field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onPointerDown={beginPasswordPeek(setShowPassword)}
+                        onPointerUp={endPasswordPeek(setShowPassword)}
+                        onPointerLeave={endPasswordPeek(setShowPassword)}
+                        onPointerCancel={endPasswordPeek(setShowPassword)}
+                        onBlur={endPasswordPeek(setShowPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
                       >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Creating account...
-                          </>
-                        ) : companyName.trim() ? (
-                          'Create Company Workspace'
-                        ) : (
-                          'Create Personal Account'
-                        )}
-                      </Button>
-</div>
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+                    <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
+                  </div>
 
-</form>
-</TabsContent>
-</Tabs>
-)}
-</CardContent>
-</Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="signup-confirm-password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onPointerDown={beginPasswordPeek(setShowConfirmPassword)}
+                        onPointerUp={endPasswordPeek(setShowConfirmPassword)}
+                        onPointerLeave={endPasswordPeek(setShowConfirmPassword)}
+                        onPointerCancel={endPasswordPeek(setShowConfirmPassword)}
+                        onBlur={endPasswordPeek(setShowConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword}</p>}
+                  </div>
 
-<p className="text-center text-sm text-muted-foreground">
-  By continuing, you agree to our Terms of Service and Privacy Policy.
-</p>
+                  {/* Submit button */}
+                  <Button type="submit" className="w-full" disabled={isSubmitting || isUsernameAvailable === false || isValidating || (username.length > 0 && username.length < 3)}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      companyName.trim() ? 'Create Company Workspace' : 'Create Personal Account'
+                    )}
+                  </Button>
+                    </>
+                  )}
+                </form>
+              </TabsContent>
+            </Tabs>
+            )}
+          </CardContent>
+        </Card>
 
-</div>
-</div>
-
-);
+        {/* ================================================================== */}
+        {/* FOOTER */}
+        {/* ================================================================== */}
+        <p className="text-center text-sm text-muted-foreground">
+          By continuing, you agree to our Terms of Service and Privacy Policy.
+        </p>
+      </div>
+    </div>
+  );
 }
