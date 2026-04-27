@@ -27,6 +27,8 @@ import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
 interface SidebarProps {
   onClose?: () => void;
   onCommandOpen?: () => void;
+  onHelpOpen?: () => void;
+  onFeedbackOpen?: () => void;
 }
 
 const navItems = [
@@ -40,7 +42,7 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
+export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: SidebarProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { data: organizations } = useOrganizations();
@@ -64,7 +66,7 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
   };
 
   return (
-    <aside className="w-72 h-screen bg-sidebar text-sidebar-foreground flex flex-col">
+    <aside className="sticky top-0 self-start w-72 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
       {/* Header */}
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center gap-3 group cursor-default">
@@ -172,16 +174,33 @@ export function Sidebar({ onClose, onCommandOpen }: SidebarProps) {
         <div className="flex items-start gap-3">
           <HelpCircle className="w-5 h-5 text-sidebar-primary flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-sidebar-accent-foreground">Need help?</p>
+            <p className="text-sm font-medium text-sidebar-accent-foreground">Help & Feedback</p>
             <p className="text-xs text-sidebar-foreground/60 mt-1">
-              Check our guides or contact support
+              Contact support or share your thoughts.
             </p>
-            <Button 
-              variant="link" 
-              className="h-auto p-0 text-xs text-sidebar-primary mt-2"
-            >
-              View Help Center
-            </Button>
+            <div className="flex items-center gap-3 mt-3">
+              <Button 
+                variant="link" 
+                className="h-auto p-0 text-xs text-sidebar-primary"
+                onClick={() => {
+                  onClose?.();
+                  onHelpOpen?.();
+                }}
+              >
+                Contact Support
+              </Button>
+              <span className="text-sidebar-border">|</span>
+              <Button 
+                variant="link" 
+                className="h-auto p-0 text-xs text-sidebar-primary"
+                onClick={() => {
+                  onClose?.();
+                  onFeedbackOpen?.();
+                }}
+              >
+                Rate App
+              </Button>
+            </div>
           </div>
         </div>
       </div>

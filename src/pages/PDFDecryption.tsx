@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileText, Loader2, ShieldAlert, AlertTriangle, Download, Share2, Trash2, Lock, RefreshCw, UploadCloud, FileUp, Search } from 'lucide-react';
+import { FileText, Loader2, ShieldAlert, AlertTriangle, Download, Share2, Trash2, Lock, RefreshCw, UploadCloud, FileUp, Search, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
@@ -18,9 +18,9 @@ export default function PDFDecryption() {
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sharingFile, setSharingFile] = useState<any | null>(null);
-  const [decryptFile, setDecryptFile] = useState<{id: string, name: string} | null>(null);
-  const [decryptEmail, setDecryptEmail] = useState('');
+  const [decryptFile, setDecryptFile] = useState<{id: string, name: string, action: 'view' | 'decrypt'} | null>(null);
   const [isRecoverOpen, setIsRecoverOpen] = useState(false);
+  const [decryptPassword, setDecryptPassword] = useState('');
   const [recoverFile, setRecoverFile] = useState<File | null>(null);
   const [isRecovering, setIsRecovering] = useState(false);
   const [isRecoverDragging, setIsRecoverDragging] = useState(false);
@@ -105,17 +105,33 @@ export default function PDFDecryption() {
     loadFiles();
   }, [loadFiles]);
 
-  const handleDownloadAndDecrypt = async (fileId: string, fileName: string, userEmail: string) => {
-    toast({ title: "Unlocking File", description: "Requesting decryption keys..." });
+  const handleSecureAction = async (fileId: string, fileName: string, action: 'view' | 'decrypt') => {
+    let viewWindow: Window | null = null;
+    if (action === 'view') {
+        viewWindow = window.open('', '_blank');
+        if (viewWindow) {
+            viewWindow.document.write('<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#64748b;">Decrypting secure document...</div>');
+            viewWindow.document.title = "Opening Secure Document";
+        }
+    }
+
+    if (/[<>'"]/.test(decryptPassword)) {
+        toast({ title: "Invalid Input", description: "Password contains dangerous characters.", variant: "destructive" });
+        return;
+    }
+
+    toast({ title: action === 'view' ? "Opening File" : "Unlocking File", description: "Requesting decryption keys..." });
     try { 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Authentication session not found.");
       
       const res = await fetch(`/api/pdf/download/${fileId}`, {
+        method: 'POST',
         headers: { 
           'Authorization': `Bearer ${session.access_token}`,
-          'X-User-Email': userEmail, // Pass the email for secure access tracking
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ password: decryptPassword }),
       });
 
       if (!res.ok) {
@@ -123,27 +139,38 @@ export default function PDFDecryption() {
         throw new Error(errorData.error);
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      let downloadName = fileName.replace(/\.enc$/i, '');
-      if (!downloadName.toLowerCase().endsWith('.pdf')) downloadName += '.pdf';
-      link.download = downloadName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove(); 
-      window.URL.revokeObjectURL(url); 
+      const rawBlob = await res.blob();
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(pdfBlob);
+      
+      if (action === 'view') {
+          if (viewWindow) {
+              viewWindow.location.href = url + '#toolbar=0&navpanes=0';
+          } else {
+              window.open(url + '#toolbar=0&navpanes=0', '_blank');
+          }
+      } else {
+          const link = document.createElement('a');
+          link.href = url;
+          let downloadName = fileName.replace(/\.enc$/i, '');
+          if (!downloadName.toLowerCase().endsWith('.pdf')) downloadName += '.pdf';
+          link.download = downloadName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove(); 
+          window.URL.revokeObjectURL(url); 
+      }
       
       log('FILE_DECRYPT_SUCCESS', 'file', {
         resourceId: fileId,
-        details: { fileName, email: userEmail }
+        details: { fileName, email: user?.email, action }
       });
-      toast({ title: "Success", description: "Document decrypted securely." });
+      toast({ title: "Success", description: action === 'view' ? "Document opened securely." : "Document decrypted securely." });
     } catch (error: any) {
+      if (viewWindow) viewWindow.close();
       log('FILE_DECRYPT_FAILURE', 'file', {
         resourceId: fileId,
-        details: { fileName, error: error.message, email: userEmail }
+        details: { fileName, error: error.message, email: user?.email }
       });
       toast({ title: "Decryption Failed", description: error.message, variant: "destructive" });
     }
@@ -169,14 +196,14 @@ export default function PDFDecryption() {
       const link = document.createElement('a');
       link.href = url;
       let downloadName = fileName.replace(/\.enc$/i, '').replace(/\.pdf$/i, '');
-      link.download = downloadName + '_encrypted.pdf';
+      link.download = downloadName + '_encrypted.enc';
       document.body.appendChild(link);
       link.click();
       link.remove(); 
       window.URL.revokeObjectURL(url); 
       
       log('FILE_DOWNLOAD_RAW' as any, 'file', { resourceId: fileId, details: { fileName } });
-      toast({ title: "Success", description: "Raw encrypted file downloaded." });
+      toast({ title: "Encrypted File Downloaded", description: "This file is locked and cannot be opened directly. Use 'Recover File' in the app to view it." });
     } catch (error: any) {
       log('FILE_DOWNLOAD_RAW_FAILURE' as any, 'file', { resourceId: fileId, details: { fileName, error: error.message } });
       toast({ title: "Download Failed", description: error.message, variant: "destructive" });
@@ -258,8 +285,9 @@ export default function PDFDecryption() {
         throw new Error(errorData.error || "Recovery failed.");
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const rawBlob = await res.blob();
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
       
@@ -437,9 +465,20 @@ export default function PDFDecryption() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name})}
+                onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name, action: 'view'})}
                 className="h-9 gap-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 hover:bg-primary hover:text-white dark:hover:bg-primary/80 transition-colors"
-                disabled={item.permission_level !== 'VIEW' && item.permission_level !== 'DOWNLOAD' && item.permission_level !== 'ADMIN'}
+                disabled={item.permission_level !== 'VIEW' && item.permission_level !== 'DOWNLOAD' && item.permission_level !== 'DECRYPT' && item.permission_level !== 'ADMIN'}
+              >
+                <Eye size={14} />
+                <span className="text-xs font-semibold">View</span>
+              </Button>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setDecryptFile({id: item.file.id, name: item.file.file_name, action: 'decrypt'})}
+                className="h-9 gap-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 hover:bg-primary hover:text-white dark:hover:bg-primary/80 transition-colors"
+                disabled={item.permission_level !== 'DECRYPT' && item.permission_level !== 'ADMIN'}
               >
                 <Download size={14} />
                 <span className="text-xs font-semibold">Decrypt</span>
@@ -450,7 +489,7 @@ export default function PDFDecryption() {
                 size="sm" 
                 onClick={() => handleDownloadRaw(item.file.id, item.file.file_name)}
                 className="h-9 gap-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 hover:bg-slate-800 dark:hover:bg-slate-700 hover:text-white transition-colors"
-                disabled={item.permission_level !== 'DOWNLOAD' && item.permission_level !== 'ADMIN'}
+                disabled={item.permission_level !== 'DOWNLOAD' && item.permission_level !== 'DECRYPT' && item.permission_level !== 'ADMIN'}
               >
                 <Lock size={14} />
                 <span className="text-xs font-semibold">Raw</span>
@@ -542,10 +581,19 @@ export default function PDFDecryption() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input 
                 placeholder="Search files..." 
-                className="pl-9 bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-primary w-full"
+                className="pl-9 pr-9 bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-primary w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -562,25 +610,25 @@ export default function PDFDecryption() {
       <Dialog open={!!decryptFile} onOpenChange={(open) => {
         if (!open) {
           setDecryptFile(null);
-          setDecryptEmail('');
+          setDecryptPassword('');
         }
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Identity</DialogTitle>
+            <DialogTitle>{decryptFile?.action === 'view' ? 'Authorize View' : 'Authorize Decryption'}</DialogTitle>
             <DialogDescription>
-              Please enter your email address to proceed with decryption. This ensures secure access tracking.
+              Please enter your account password to authorize {decryptFile?.action === 'view' ? 'securely viewing this document' : 'decrypting and downloading this document'}. This is a security measure to ensure you are the account owner.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="decrypt-email" className="text-xs font-bold uppercase tracking-tight text-slate-500">Email Address</Label>
+              <Label htmlFor="decrypt-password">Password</Label>
               <Input 
-                id="decrypt-email"
-                type="email" 
-                placeholder="your.email@example.com" 
-                value={decryptEmail} 
-                onChange={(e) => setDecryptEmail(e.target.value)} 
+                id="decrypt-password"
+                type="password" 
+                placeholder="••••••••" 
+                value={decryptPassword} 
+                onChange={(e) => setDecryptPassword(e.target.value)} 
                 autoFocus
               />
             </div>
@@ -588,29 +636,21 @@ export default function PDFDecryption() {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setDecryptFile(null);
-              setDecryptEmail('');
+              setDecryptPassword('');
             }}>
               Cancel
             </Button>
             <Button 
               onClick={() => {
-                if (decryptEmail) {
-                      if (user?.email && decryptEmail.toLowerCase() !== user.email.toLowerCase()) {
-                        toast({ 
-                          title: "Verification Failed", 
-                          description: "The email address entered does not match your account's registered email.", 
-                          variant: "destructive" 
-                        });
-                        return;
-                      }
-                  handleDownloadAndDecrypt(decryptFile!.id, decryptFile!.name, decryptEmail);
+                if (decryptPassword) {
+                  handleSecureAction(decryptFile!.id, decryptFile!.name, decryptFile!.action);
                   setDecryptFile(null);
-                  setDecryptEmail('');
+                  setDecryptPassword('');
                 }
               }}
-              disabled={!decryptEmail}
+              disabled={!decryptPassword}
             >
-              Confirm & Decrypt
+              {decryptFile?.action === 'view' ? 'Confirm & View' : 'Confirm & Decrypt'}
             </Button>
           </DialogFooter>
         </DialogContent>

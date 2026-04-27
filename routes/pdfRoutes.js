@@ -8,6 +8,7 @@ import { encryptPDF } from '../services/encryptionServices.js';
 import { retrieveAndDecryptFile } from '../services/SecureAccessController.js'; // Import the centralized decryption logic
 import { decryptPDF } from '../services/decryptionServices.js';
 import { logEvent } from '../services/auditService.js';
+import rateLimit from 'express-rate-limit';
 
 // --- EMAIL SERVICE CONFIGURATION ---
 const EMAIL_FROM_ADDRESS = String(process.env.EMAIL_FROM_ADDRESS || 'no-reply@securewebops.com').trim();
@@ -183,8 +184,17 @@ if (!process.env.FRONTEND_URL) {
 
 const router = express.Router();
 
+// Strict rate limiter for password/auth routes (3 attempts per 15 minutes)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    message: { error: "Too many decryption attempts from this IP. Please try again after 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 const upload = multer({ storage: multer.memoryStorage() });
-const PERMISSION_LEVELS = new Set(['VIEW', 'DOWNLOAD', 'ADMIN']);
+const PERMISSION_LEVELS = new Set(['VIEW', 'DOWNLOAD', 'DECRYPT', 'ADMIN']);
 
 function sanitizeStorageSegment(value) {
     const normalized = String(value || 'document.pdf')
@@ -287,6 +297,7 @@ router.use(async (req, res, next) => {
 // Initialize Supabase Connection
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
     throw new Error('Missing Supabase admin env vars. Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_KEY.');
@@ -428,6 +439,10 @@ async function resolveShareRecipient(targetUserId, requester = null) {
     const recipient = String(targetUserId || '').trim();
     if (!recipient) {
         return { error: { status: 400, message: "Recipient Email or Username is required." } };
+    }
+    
+    if (/[<>]/.test(recipient)) {
+        return { error: { status: 400, message: "Invalid characters in recipient." } };
     }
 
     const requesterEmail = String(requester?.email || '').trim().toLowerCase();
@@ -644,7 +659,7 @@ const checkPermission = (requiredLevel) => async (req, res, next) => {
             effectivePermissionLevel = 'ADMIN';
         }
 
-        const levels = { 'NONE': 0, 'VIEW': 1, 'DOWNLOAD': 2, 'ADMIN': 3 };
+        const levels = { 'NONE': 0, 'VIEW': 1, 'DOWNLOAD': 2, 'DECRYPT': 3, 'ADMIN': 4 };
         if (levels[effectivePermissionLevel] < levels[requiredLevel]) {
             await logEvent({ 
                 action: 'UNAUTHORIZED_ACCESS', 
@@ -682,6 +697,10 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
     if (!req.file) {
         console.log('No file provided');
         return res.status(400).json({ error: "No file provided." });
+    }
+
+    if (/[<>]/.test(fileName)) {
+        return res.status(400).json({ error: "Security Policy: File name contains invalid characters (< or >)." });
     }
 
     const mimeType = req.file.mimetype || 'application/octet-stream';
@@ -810,23 +829,53 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
 });
 
 // --- DOWNLOAD & DECRYPT ---
-router.get('/download/:fileId', checkPermission('VIEW'), async (req, res) => {
+router.post('/download/:fileId', authLimiter, checkPermission('VIEW'), async (req, res) => {
     const { fileId } = req.params;
     const userId = req.user?.id;
+    const userEmail = req.user?.email;
+    const { password } = req.body;
+
+    if (!password) {
+        return res.status(400).json({ error: "Password is required for decryption." });
+    }
+
+    if (/[<>'"]/.test(password)) {
+        return res.status(400).json({ error: "Security Policy: Password contains invalid characters." });
+    }
 
     try {
+        // 1. Verify password using a temporary isolated client to prevent polluting the global server session
+        const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
+        
+        const { error: signInError } = await tempAuthClient.auth.signInWithPassword({
+            email: userEmail,
+            password: password,
+        });
+
+        if (signInError) {
+            await logEvent({
+                action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+                status: 'BLOCKED',
+                user: userId,
+                fileId: fileId,
+                ip: req.ip,
+                details: 'Blocked decryption attempt due to incorrect password.'
+            });
+            return res.status(401).json({ error: "Invalid password. Decryption denied." });
+        }
+
         // Use the centralized secure access controller for retrieval and decryption
         const { buffer: decryptedBuffer, fileName, mimeType } = await retrieveAndDecryptFile(userId, fileId); 
 
         let safeName = sanitizeStorageSegment(fileName);
         if (!safeName.toLowerCase().endsWith('.pdf')) safeName += '.pdf';
 
-        // The logEvent for success is already handled within retrieveAndDecryptFile
         res.setHeader('Content-Type', mimeType || 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
         res.send(decryptedBuffer);
     } catch (error) {
-        // 5. COMPLIANCE: Log the failure for security monitoring
         console.error("Critical Security Error:", error);
         const message = String(error.message || '');
         const normalizedMessage = message.toLowerCase();
@@ -885,8 +934,8 @@ router.get('/raw/:fileId', checkPermission('DOWNLOAD'), async (req, res) => {
         }
 
         const baseName = String(file.original_file_name || file.encrypted_file_name || 'document').replace(/\.enc$/i, '').replace(/\.pdf$/i, '');
-        let safeName = sanitizeStorageSegment(baseName + '_encrypted.pdf');
-        if (!safeName.toLowerCase().endsWith('.pdf')) safeName += '.pdf';
+        let safeName = sanitizeStorageSegment(baseName + '_encrypted.enc');
+        if (!safeName.toLowerCase().endsWith('.enc')) safeName += '.enc';
 
         res.setHeader('Content-Type', 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
@@ -1048,6 +1097,11 @@ router.post('/share/:fileId/revoke', checkPermission('ADMIN'), async (req, res) 
         }
 
         const revokeReason = String(reason || 'Revoked by file owner').trim().slice(0, 250) || 'Revoked by file owner';
+
+        if (/[<>]/.test(revokeReason)) {
+            return res.status(400).json({ error: "Invalid characters in revoke reason." });
+        }
+
         let data;
         let error;
         if (PDF_HARDENED_SCHEMA) {
@@ -1299,6 +1353,10 @@ router.post('/decrypt-external', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No encrypted file provided." });
+        }
+
+        if (/[<>]/.test(req.file.originalname)) {
+            return res.status(400).json({ error: "Security Policy: File name contains invalid characters (< or >)." });
         }
 
         const userId = req.user.id;

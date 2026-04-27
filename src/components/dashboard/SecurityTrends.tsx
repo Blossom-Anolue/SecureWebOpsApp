@@ -3,17 +3,21 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, Area
 import { format, subDays } from 'date-fns';
 import { TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface SecurityTrendsProps {
-  data: { date: string; score: number }[];
+  data: { date: string; score: number; id?: string }[];
 }
 
 export function SecurityTrends({ data }: SecurityTrendsProps) {
-  const chartData = data.map(item => ({
-    ...item,
-    dateLabel: format(new Date(item.date), 'MMM d'),
-    fullDate: format(new Date(item.date), 'MMM d, yyyy'),
-  }));
+  const navigate = useNavigate();
+  const chartData = data
+    .map(item => ({
+      ...item,
+      timestamp: new Date(item.date).getTime(),
+      fullDate: format(new Date(item.date), 'MMM d, yyyy · h:mm a'),
+    }))
+    .sort((a, b) => a.timestamp - b.timestamp); // Sort chronologically for accurate timeline plotting
 
   // Calculate trend
   const latestScore = data[data.length - 1]?.score ?? 0;
@@ -47,6 +51,15 @@ export function SecurityTrends({ data }: SecurityTrendsProps) {
     if (scoreDiff > 5) return 'text-success';
     if (scoreDiff < -5) return 'text-destructive';
     return 'text-muted-foreground';
+  };
+
+  const handleClick = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length > 0) {
+      const payload = state.activePayload[0].payload;
+      if (payload.id) {
+        navigate(`/scans/${payload.id}`);
+      }
+    }
   };
 
   return (
@@ -84,7 +97,7 @@ export function SecurityTrends({ data }: SecurityTrendsProps) {
         {/* Chart */}
         <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }} onClick={handleClick} style={{ cursor: 'pointer' }}>
               <defs>
                 <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -92,11 +105,14 @@ export function SecurityTrends({ data }: SecurityTrendsProps) {
                 </linearGradient>
               </defs>
               <XAxis 
-                dataKey="dateLabel" 
+                type="number"
+                dataKey="timestamp" 
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(val) => format(new Date(val), 'MMM d')}
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                interval="preserveStartEnd"
+                minTickGap={30}
               />
               <YAxis 
                 domain={[0, 100]}
@@ -123,6 +139,8 @@ export function SecurityTrends({ data }: SecurityTrendsProps) {
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#scoreGradient)"
+                dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--background))', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -132,10 +150,10 @@ export function SecurityTrends({ data }: SecurityTrendsProps) {
         <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3" />
           <span>
-            {data.length > 1 
-              ? `${data.length} data points over ${Math.ceil((new Date(data[data.length - 1]?.date).getTime() - new Date(data[0]?.date).getTime()) / (1000 * 60 * 60 * 24))} days`
-              : 'More data will appear after additional scans'
-            }
+            {data.length > 1 ? (() => {
+              const daysDiff = Math.max(1, Math.ceil((chartData[chartData.length - 1].timestamp - chartData[0].timestamp) / (1000 * 60 * 60 * 24)));
+              return `${data.length} scans over ${daysDiff} day${daysDiff === 1 ? '' : 's'}`;
+            })() : 'More data will appear after additional scans'}
           </span>
         </div>
       </CardContent>

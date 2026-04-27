@@ -36,6 +36,7 @@ import {
   FileLock2,
   Share2
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ============================================================================
 // DATA
@@ -101,12 +102,14 @@ const founders = [
  * @returns The rendered home page
  */
 export default function Home() {
+  const { user } = useAuth();
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col relative">
       {/* ================================================================== */}
       {/* HEADER - Sticky navigation with logo and auth links */}
       {/* ================================================================== */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo and brand name */}
           <Link to="/" className="flex items-center gap-2.5 group">
@@ -120,16 +123,25 @@ export default function Home() {
           {/* Navigation actions */}
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="ghost" asChild>
-              <Link to="/auth">Sign In</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/auth">Get Started</Link>
-            </Button>
+            {user ? (
+              <Button asChild>
+                <Link to="/dashboard">Go to Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/auth">Sign In</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/auth">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
+      <main className="flex-1 flex flex-col">
       {/* ================================================================== */}
       {/* HERO SECTION - Main value proposition */}
       {/* ================================================================== */}
@@ -166,14 +178,16 @@ export default function Home() {
             {/* CTA buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button size="lg" asChild className="text-base">
-                <Link to="/auth">
-                  Start Free Scan
+                <Link to={user ? "/dashboard" : "/auth"}>
+                  {user ? "Go to Dashboard" : "Start Free Scan"}
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="text-base">
-                <Link to="/auth">See Demo</Link>
-              </Button>
+              {!user && (
+                <Button size="lg" variant="outline" asChild className="text-base">
+                  <Link to="/auth">See Demo</Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -362,6 +376,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
+      </main>
     </div>
   );
 }

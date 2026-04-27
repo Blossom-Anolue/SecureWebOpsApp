@@ -33,6 +33,9 @@ export default function ResetPassword() {
     if (password.length < 6) {
       return toast({ title: "Error", description: "Password must be at least 6 characters long.", variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
     }
+    if (/[<>'"]/.test(password)) {
+      return toast({ title: "Error", description: "Invalid characters (<, >, ', \") are not allowed.", variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+    }
 
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });

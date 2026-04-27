@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 import { useActivityLogger } from '@/hooks/useActivityLog';
 
 interface FileSharingProps {
@@ -33,13 +34,41 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
   const [permissionLevel, setPermissionLevel] = useState('VIEW');
   const [isSharing, setIsSharing] = useState(false);
   const { log } = useActivityLogger();
+  const { user } = useAuth();
 
   const handleShare = async () => {
     if (!recipientInput) return;
+
+    if (/[<>]/.test(recipientInput)) {
+      toast({ 
+        title: "Invalid Input", 
+        description: "Recipient contains invalid characters (< or >).", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (recipientInput.trim().toLowerCase() === user?.email?.toLowerCase()) {
+      toast({ 
+        title: "Notice", 
+        description: "You already have owner access to this file." 
+      });
+      return;
+    }
+
     setIsSharing(true);
 
     try {
       const targetUserId = recipientInput.trim();
+      
+      let expiresAtISO = null;
+      if (shareExpiresAt) {
+        const dateObj = new Date(shareExpiresAt);
+        if (dateObj.getTime() <= Date.now()) {
+          throw new Error("Share expiration must be in the future.");
+        }
+        expiresAtISO = dateObj.toISOString();
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`/api/pdf/share/${fileId}`, {
@@ -48,7 +77,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}` 
         },
-        body: JSON.stringify({ targetUserId, level: permissionLevel, expiresAt: shareExpiresAt || null })
+        body: JSON.stringify({ targetUserId, level: permissionLevel, expiresAt: expiresAtISO })
       });
 
       if (!response.ok) {
@@ -56,9 +85,11 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
         throw new Error(getApiErrorMessage(errorData, "Permission update failed on server."));
       }
 
+      const responseData = await response.json().catch(() => ({}));
+
       toast({ 
-        title: "Success", 
-        description: `Access granted to ${targetUserId}` 
+        title: responseData.message?.includes('already') ? "Notice" : "Success", 
+        description: responseData.message || `Access granted to ${targetUserId}` 
       }); 
       
       setShareExpiresAt('');
@@ -73,6 +104,11 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
       setIsSharing(false);
     }
   };
+
+  // Calculate minimum datetime (current local time) to prevent selecting past dates
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  const minDateTime = now.toISOString().slice(0, 16);
 
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -124,6 +160,7 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
                 className="w-full px-4 py-5 border-slate-200 rounded-xl focus-visible:ring-primary"
                 value={shareExpiresAt}
                 onChange={(e) => setShareExpiresAt(e.target.value)}
+                min={minDateTime}
               />
             </div>
 
@@ -139,13 +176,19 @@ export default function FileSharing({ fileId, fileName, onClose }: FileSharingPr
                 <SelectItem value="VIEW">
                   <div className="flex items-center gap-2">
                     <Eye size={16} className="text-slate-500" />
-                    <span>View Only</span>
+                    <span>View Only (Browser)</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="DOWNLOAD">
                   <div className="flex items-center gap-2">
+                    <Lock size={16} className="text-slate-500" />
+                    <span>Download (Raw Encrypted)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="DECRYPT">
+                  <div className="flex items-center gap-2">
                     <Download size={16} className="text-slate-500" />
-                    <span>Download (Raw & Decrypt)</span>
+                    <span>Decrypt (Download Plaintext)</span>
                   </div>
                 </SelectItem>
               </SelectContent>

@@ -83,6 +83,10 @@ async function dnsResolve(hostname) {
 }
 
 export async function validateTargetUrl(rawTarget) {
+  if (/[<>'"]/.test(rawTarget)) {
+    throw new Error('Target contains dangerous characters');
+  }
+
   let url;
   try {
     url = new URL(rawTarget);

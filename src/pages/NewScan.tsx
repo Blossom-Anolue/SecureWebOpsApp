@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Zap, Search, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, Zap, Search, Info, Loader2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -10,9 +10,12 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState } from '@/components/common/LoadingState';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useDomains, useCreateScan } from '@/hooks/useSecurityData';
+import { useDomains, useCreateScan, useAddDomain } from '@/hooks/useSecurityData';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { useActivityLogger } from '@/hooks/useActivityLog';
 import { Shield } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 function getReadableError(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
@@ -39,9 +42,120 @@ export default function NewScan() {
   const { data: domains, isLoading } = useDomains();
   const createScan = useCreateScan();
   const { log } = useActivityLogger();
+  const { data: organizations } = useOrganizations();
+  const addDomain = useAddDomain();
   
   const [selectedDomainId, setSelectedDomainId] = useState('');
   const [scanType, setScanType] = useState<'quick' | 'full'>('quick');
+  
+  const [newDomain, setNewDomain] = useState('');
+  const [newDomainScope, setNewDomainScope] = useState<string>('personal');
+  const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
+
+  const handleAddDomain = async () => {
+    if (!newDomain.trim()) return;
+    
+    if (/[<>'"]/.test(newDomain)) {
+      toast({
+        title: "Invalid Input",
+        description: "Domain contains dangerous characters.",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(newDomain.trim())) {
+      toast({
+        title: "Invalid Domain",
+        description: "Please enter a valid domain name (e.g., example.com).",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
+    try {
+      const added = await addDomain.mutateAsync({
+        domain: newDomain,
+        organizationId: newDomainScope === 'personal' ? null : newDomainScope,
+      });
+      setSelectedDomainId(added.id);
+      setNewDomain('');
+      setNewDomainScope('personal');
+      setIsAddDomainOpen(false);
+      toast({
+        title: "Domain added",
+        description: `${newDomain} has been added to your monitored domains.`,
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add domain. Please try again.",
+        variant: "destructive",
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+    }
+  };
+
+  const addDomainDialog = (
+    <Dialog open={isAddDomainOpen} onOpenChange={setIsAddDomainOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add New Domain</DialogTitle>
+          <DialogDescription>
+            Enter the domain you want to monitor for security vulnerabilities.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-domain">Domain</Label>
+            <Input
+              id="new-domain"
+              placeholder="example.com"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+            />
+          </div>
+          {organizations && organizations.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="domain-scope">Ownership</Label>
+              <Select value={newDomainScope} onValueChange={setNewDomainScope}>
+                <SelectTrigger id="domain-scope">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">Personal</SelectItem>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsAddDomainOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddDomain} disabled={addDomain.isPending}>
+            {addDomain.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              'Add Domain'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   if (isLoading) {
     return <LoadingState message="Loading domains..." />;
@@ -57,10 +171,11 @@ export default function NewScan() {
         <EmptyState
           icon={Shield}
           title="No domains to scan"
-          description="Add a domain in Settings before you can run a security scan."
-          actionLabel="Go to Settings"
-          onAction={() => navigate('/settings')}
+          description="Add a domain before you can run a security scan."
+          actionLabel="Add Domain"
+          onAction={() => setIsAddDomainOpen(true)}
         />
+        {addDomainDialog}
       </div>
     );
   }
@@ -147,8 +262,9 @@ export default function NewScan() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="link" className="h-auto p-0 mt-2 text-sm" onClick={() => navigate('/settings')}>
-              + Add new domain
+            <Button type="button" variant="link" className="h-auto p-0 mt-2 text-sm" onClick={() => setIsAddDomainOpen(true)}>
+              <Globe className="w-3 h-3 mr-1" />
+              Add new domain
             </Button>
           </CardContent>
         </Card>
@@ -250,6 +366,7 @@ export default function NewScan() {
           )}
         </Button>
       </form>
+      {addDomainDialog}
     </div>
   );
 }

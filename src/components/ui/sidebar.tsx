@@ -116,7 +116,7 @@ const SidebarProvider = React.forwardRef<
               ...style,
             } as React.CSSProperties
           }
-          className={cn("group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar", className)}
+          className={cn("group/sidebar-wrapper flex h-svh w-full overflow-hidden has-[[data-variant=inset]]:bg-sidebar", className)}
           ref={ref}
           {...props}
         >
@@ -141,7 +141,7 @@ const Sidebar = React.forwardRef<
   if (collapsible === "none") {
     return (
       <div
-        className={cn("flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground", className)}
+        className={cn("sticky top-0 self-start flex h-svh w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground", className)}
         ref={ref}
         {...props}
       >
@@ -274,7 +274,7 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<"main
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background",
+        "relative flex h-full flex-1 flex-col bg-background overflow-y-auto",
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className,
       )}
@@ -302,12 +302,12 @@ const SidebarInput = React.forwardRef<React.ElementRef<typeof Input>, React.Comp
 SidebarInput.displayName = "SidebarInput";
 
 const SidebarHeader = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return <div ref={ref} data-sidebar="header" className={cn("flex flex-col gap-2 p-2", className)} {...props} />;
+  return <div ref={ref} data-sidebar="header" className={cn("sticky top-0 z-10 flex flex-col gap-2 p-2 bg-sidebar", className)} {...props} />;
 });
 SidebarHeader.displayName = "SidebarHeader";
 
 const SidebarFooter = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(({ className, ...props }, ref) => {
-  return <div ref={ref} data-sidebar="footer" className={cn("flex flex-col gap-2 p-2", className)} {...props} />;
+  return <div ref={ref} data-sidebar="footer" className={cn("sticky bottom-0 z-10 flex flex-col gap-2 p-2 bg-sidebar", className)} {...props} />;
 });
 SidebarFooter.displayName = "SidebarFooter";
 

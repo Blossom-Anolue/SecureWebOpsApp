@@ -170,9 +170,15 @@ export default function PDFEncryption() {
       });
 
       setStatus('success');
+      setFiles([]);
       setResults(newResults);
 
-      toast({ title: "Vault Secured", description: `${files.length} file(s) encrypted and stored.`, className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      const fileNames = files.map(f => f.name).join(', ');
+      toast({ 
+        title: "Encryption Verified & Stored", 
+        description: files.length === 1 ? `"${fileNames}" was securely encrypted and stored in your vault.` : `${files.length} files securely encrypted and stored in your vault.`, 
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-100 dark:border-emerald-800' 
+      });
     } catch (error: unknown) {
       const fallbackMessage = error instanceof TypeError && error.message?.includes('expected pattern')
         ? 'Upload request could not be created. This usually means the app URL or upload filename contains invalid characters.'
@@ -185,18 +191,44 @@ export default function PDFEncryption() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid lg:grid-cols-12 gap-8">
-        {/* Upload Section */}
-        <Card className="lg:col-span-7 border-slate-200/60 dark:border-slate-800 shadow-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <FileUp className="w-5 h-5 text-primary" />
-              Upload Document
-            </CardTitle>
-            <CardDescription>
-              Encrypt and securely store your sensitive PDF documents.
-            </CardDescription>
+    <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {status === 'success' ? (
+        <Card className="border-emerald-200 dark:border-emerald-800 shadow-lg bg-emerald-50/50 dark:bg-emerald-900/20 backdrop-blur-xl text-center py-12">
+          <CardContent className="space-y-6 flex flex-col items-center">
+            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Files Successfully Secured</h2>
+              <p className="text-slate-600 dark:text-slate-300 max-w-md mx-auto">
+                Your documents have been encrypted with AES-256-GCM and safely stored in your vault.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Button variant="outline" onClick={() => { setStatus('idle'); setResults([]); }} className="w-full sm:w-auto">
+                Upload Another File
+              </Button>
+              <Button onClick={() => navigate('/vault')} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white">
+                Go to My Vault
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-slate-200/60 dark:border-slate-800 shadow-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <FileUp className="w-5 h-5 text-primary" />
+                Secure Document Upload
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Encrypt and securely store your sensitive PDF documents.
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/vault')} className="hidden sm:flex text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
+              View Vault
+            </Button>
           </CardHeader>
           <CardContent className="space-y-6">
             <div 
@@ -293,97 +325,14 @@ export default function PDFEncryption() {
                 </Button>
               </div>
             )}
+            
+            <p className="text-xs text-center text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 pt-2">
+              <Shield className="w-3.5 h-3.5" />
+              Files are encrypted client-side via AES-256-GCM before storage
+            </p>
           </CardContent>
         </Card>
-
-        {/* Status / Result Section */}
-        <div className="lg:col-span-5 space-y-6">
-          {status === 'success' && results.length > 0 ? (
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {results.map((res, index) => (
-                <Card key={index} className="bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-emerald-800 dark:text-emerald-400 flex items-center gap-2 text-lg">
-                      <CheckCircle className="text-emerald-600 w-5 h-5" />
-                      Encryption Verified
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm text-emerald-900/80 dark:text-emerald-200/80">
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
-                      <span className="font-medium">Original File</span>
-                      <span className="truncate pl-4">{res.originalFileName}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
-                      <span className="font-medium">Vault Path</span>
-                      <span className="truncate pl-4 font-mono text-xs">{res.path}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-emerald-200/50 dark:border-emerald-800/50">
-                      <span className="font-medium">Cipher</span>
-                      <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">AES-256-GCM</Badge>
-                    </div>
-                    <div className="pt-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100/50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-[10px] uppercase font-mono tracking-wider font-semibold border border-emerald-200/50 dark:border-emerald-800/50">
-                        <CheckCircle className="w-3 h-3" /> MD5_HASH_VERIFIED: SUCCESS
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : null}
-          
-          <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl border-slate-700 relative overflow-hidden min-h-[220px]">
-            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-primary/30 blur-3xl rounded-full"></div>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-100 text-lg">
-                <Shield className="w-5 h-5 text-[#4AABB1]" /> 
-                Security Protocol
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-5 text-sm text-slate-300 relative z-10">
-                <li className="flex gap-3 items-start">
-                  <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#4AABB1] shrink-0" />
-                  <p className="leading-relaxed">Files are <strong>never stored in plaintext</strong>. Encryption occurs via AES-256-GCM before object storage.</p>
-                </li>
-                <li className="flex gap-3 items-start">
-                  <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#4AABB1] shrink-0" />
-                  <p className="leading-relaxed">Master key is <strong>isolated in process memory</strong> preventing unauthorized extraction.</p>
-                </li>
-                <li className="flex gap-3 items-start">
-                  <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#4AABB1] shrink-0" />
-                  <p className="leading-relaxed">Authentication tags automatically prevent <strong>Bit-Flipping attacks</strong> and verify integrity.</p>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="py-5 bg-slate-50/80 dark:bg-slate-900/80 border-b dark:border-slate-800">
-          <div>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Database className="w-5 h-5 text-primary" />
-              Next Step
-            </CardTitle>
-            <CardDescription className="mt-1">Manage encrypted files, downloads, and sharing from the vault.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <p className="text-slate-900 dark:text-slate-100 font-semibold">Your file is ready whenever you want to come back to it.</p>
-              <p className="text-sm text-slate-500 max-w-2xl">
-                Open My Vault & Sharing to review what you have protected, download what you need, or share access with the right people.
-              </p>
-            </div>
-            <Button onClick={() => navigate('/vault')} className="bg-primary hover:bg-primary/90 text-white shrink-0">
-              Open My Vault & Sharing
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }

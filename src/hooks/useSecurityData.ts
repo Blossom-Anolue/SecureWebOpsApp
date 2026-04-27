@@ -53,7 +53,7 @@ export interface Domain {
   user_id: string;
   /** The domain name (e.g., "example.com") */
   domain: string;
-  /** Whether domain ownership has been verified */
+  /** Whether the domain is active for scanning. Currently defaults to true on creation. */
   is_verified: boolean;
   /** Whether this is the user's primary/main domain */
   is_primary: boolean;
@@ -237,6 +237,8 @@ export interface Profile {
   company_name: string | null;
   /** Industry category for benchmarking */
   industry: string | null;
+  /** URL to the user's avatar image */
+  avatar_url?: string | null;
   /** Profile creation timestamp */
   created_at: string;
   /** Last update timestamp */

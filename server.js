@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -23,9 +24,57 @@ const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, 'dist');
 const extensionZipPath = path.join(__dirname, 'securewebops-extension.zip');
 
-app.use(cors());
+// --- SECURITY: STRICT CORS CONFIGURATION ---
+// Only allow requests from your trusted frontend domains
+const allowedOrigins = [
+  'https://your-production-app.com', // Replace with your actual production domain
+  'https://staging.your-app.com',
+  'http://localhost:5173',
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [])
+].map(url => url.trim().replace(/\/$/, ''));
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like server-to-server) or from allowed frontend
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      console.warn(`[SECURITY] Blocked request from unauthorized CORS origin: ${origin}`);
+      return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+    }
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
+
+// --- SECURITY: GLOBAL API RATE LIMITING ---
+const globalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per window
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: { error: "Too many requests from this IP, please try again later." },
+});
+app.use('/api', globalApiLimiter);
+
+// --- SECURITY: BRUTE-FORCE PROTECTION ---
+// Specific stricter rate limiter for sensitive routes (password decryption)
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour window
+  max: 10, // block after 10 requests per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password attempts from this IP, please try again after an hour." }
+});
+
+// Apply strict rate limiting to password-protected decryption endpoints before the main router
+app.use('/api/pdf/download', authLimiter);
+app.use('/api/pdf/decrypt-external', authLimiter);
 
 // Standard Routes
 app.use('/api/pdf', pdfRoutes);

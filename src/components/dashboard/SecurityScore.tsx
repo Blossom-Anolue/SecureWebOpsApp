@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 
 interface SecurityScoreProps {
   data: SecurityScoreType;
+  onClick?: () => void;
 }
 
 const tierConfig: Record<ScoreTier, { label: string; color: string; bgColor: string }> = {
@@ -13,14 +14,19 @@ const tierConfig: Record<ScoreTier, { label: string; color: string; bgColor: str
   critical: { label: 'Critical Issues', color: 'text-score-critical', bgColor: 'bg-score-critical' },
 };
 
-export function SecurityScore({ data }: SecurityScoreProps) {
+export function SecurityScore({ data, onClick }: SecurityScoreProps) {
   const tier = tierConfig[data.tier];
   const change = data.current - data.previous;
   const circumference = 2 * Math.PI * 45;
   const strokeDashoffset = circumference - (data.current / 100) * circumference;
 
   return (
-    <div className="bg-card rounded-xl border shadow-card p-6 animate-slide-up">
+    <div 
+      className={cn("bg-card rounded-xl border shadow-card p-6 animate-slide-up transition-all duration-300", onClick && "cursor-pointer hover:shadow-md hover:border-primary/40")}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="flex flex-col md:flex-row md:items-center gap-6">
         {/* Score Circle */}
         <div className="relative w-32 h-32 mx-auto md:mx-0">

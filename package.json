@@ -50,6 +50,7 @@
     "dotenv": "^17.2.4",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.4.1",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
     "multer": "^2.0.2",

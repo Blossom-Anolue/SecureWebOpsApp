@@ -39,15 +39,15 @@ import { z } from 'zod';
  * - Password must be at least 6 characters
  */
 const authSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Please enter a valid email address').regex(/^[^<>'"]*$/, 'Invalid characters are not allowed'),
+  password: z.string().min(6, 'Password must be at least 6 characters').regex(/^[^<>'"]*$/, "Invalid characters (<, >, ', \") are not allowed"),
 });
 
 const signUpSchema = authSchema.extend({
-  fullName: z.string().trim().min(2, 'Please enter your name'),
-  companyName: z.string().trim().optional(),
-  username: z.string().trim().min(3, 'Username must be at least 3 characters'),
-  jobRole: z.string().trim().optional(),
+  fullName: z.string().trim().min(2, 'Please enter your name').regex(/^[^<>]*$/, 'Invalid characters (< or >) are not allowed'),
+  companyName: z.string().trim().regex(/^[^<>]*$/, 'Invalid characters (< or >) are not allowed').optional(),
+  username: z.string().trim().min(3, 'Username must be at least 3 characters').regex(/^[^<>]*$/, 'Invalid characters (< or >) are not allowed'),
+  jobRole: z.string().trim().regex(/^[^<>]*$/, 'Invalid characters (< or >) are not allowed').optional(),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -68,7 +68,7 @@ const signUpSchema = authSchema.extend({
  */
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading, signIn, signUp, signInWithMagicLink, resetPassword } = useAuth();
+  const { user, loading, signIn, signUp, signInWithMagicLink, resetPassword, isAwaitingPasswordReset, signOut } = useAuth();
   
   // Form state
   const [activeTab, setActiveTab] = useState('signin');
@@ -93,6 +93,8 @@ export default function Auth() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const beginPasswordPeek = (setter: (value: boolean) => void) => (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -108,10 +110,10 @@ export default function Auth() {
    * This prevents showing the auth page to authenticated users.
    */
   useEffect(() => {
-    if (user && !loading) {
+    if (user && !loading && !isAwaitingPasswordReset) {
       navigate('/dashboard');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, isAwaitingPasswordReset, navigate]);
 
   useEffect(() => {
     if (timer > 0) {
@@ -211,14 +213,41 @@ export default function Auth() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error } = await resetPassword(email);
     setIsSubmitting(false);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
       toast({ title: "Email Sent", description: "Check your inbox for the reset link." });
       setIsResetting(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      return toast({ title: "Error", description: "Password must be at least 6 characters.", variant: "destructive" });
+    }
+    if (newPassword !== confirmNewPassword) {
+      return toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+    }
+    if (/[<>'"]/.test(newPassword)) {
+      return toast({ title: "Error", description: "Invalid characters (<, >, ', \") are not allowed.", variant: "destructive" });
+    }
+
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsSubmitting(false);
+    } else {
+      // Force sign out so they have to log in again with their new password
+      await signOut();
+      toast({ title: "Success", description: "Password updated successfully. Please sign in with your new password.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      setIsSubmitting(false);
+      setActiveTab('signin');
+      setNewPassword('');
+      setConfirmNewPassword('');
     }
   };
 
@@ -345,14 +374,57 @@ export default function Auth() {
         <Card>
           <CardHeader className="text-center pb-2">
             <CardTitle className="flex items-center justify-center gap-2">
-            {showVerification || showMagicLinkSent ? 'Check Email' : isResetting ? 'Reset Password' : activeTab === 'signin' ? 'Welcome back' : 'Welcome'}
+              {isAwaitingPasswordReset ? 'Set New Password' : showVerification || showMagicLinkSent ? 'Check Email' : isResetting ? 'Reset Password' : activeTab === 'signin' ? 'Welcome back' : 'Welcome'}
             </CardTitle>
             <CardDescription>
-              {showVerification || showMagicLinkSent || isResetting ? '' : 'Sign in to your account or create a new one'}
+              {isAwaitingPasswordReset ? 'Enter a new password for your account' : showVerification || showMagicLinkSent || isResetting ? '' : 'Sign in to your account or create a new one'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {showVerification ? (
+            {isAwaitingPasswordReset ? (
+              <form onSubmit={handleSetNewPassword} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <button type="button" tabIndex={-1} onPointerDown={beginPasswordPeek(setShowPassword)} onPointerUp={endPasswordPeek(setShowPassword)} onPointerLeave={endPasswordPeek(setShowPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirm New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      required
+                    />
+                    <button type="button" tabIndex={-1} onPointerDown={beginPasswordPeek(setShowConfirmPassword)} onPointerUp={endPasswordPeek(setShowConfirmPassword)} onPointerLeave={endPasswordPeek(setShowConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</> : 'Update Password & Sign Out'}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full" onClick={() => signOut()}>
+                  Cancel
+                </Button>
+              </form>
+            ) : showVerification ? (
               <div className="text-center space-y-4 py-4">
                 <MailCheck className="mx-auto w-12 h-12 text-primary" />
                 <p className="text-sm">We've sent a verification link to <strong>{email}</strong>.</p>
