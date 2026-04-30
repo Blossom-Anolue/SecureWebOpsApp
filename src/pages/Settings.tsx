@@ -18,7 +18,6 @@ import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotific
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-
 async function copyTextToClipboard(value: string) {
   if (!value) {
     throw new Error('Nothing to copy.');
@@ -455,7 +454,7 @@ export default function Settings() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="industry">Industry</Label>
-              <Select value={industry} onValueChange={setIndustry}>
+              <Select value={industry || undefined} onValueChange={setIndustry}>
                 <SelectTrigger id="industry">
                   <SelectValue placeholder="Select industry" />
                 </SelectTrigger>

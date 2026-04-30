@@ -425,7 +425,7 @@ async function handleScan() {
   try {
     // Get SecureWebOps tab
     const tabs = await chrome.tabs.query({
-      url: "https://securewebops.gannon.link/*"
+      url: `${CONFIG.appBaseUrl}/*`
     });
 
     if (!tabs || tabs.length === 0) {
@@ -457,7 +457,7 @@ async function handleScan() {
     }
 
     // 🔥 YOUR WORKING BACKEND CALL
-    const response = await fetch("http://172.20.0.220:3000/api/scan", {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/scan`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

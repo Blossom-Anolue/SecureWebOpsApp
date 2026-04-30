@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 
 const Home = lazy(() => import("@/pages/Home"));
 const Auth = lazy(() => import("@/pages/Auth"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Scans = lazy(() => import("@/pages/Scans"));
 const NewScan = lazy(() => import("@/pages/NewScan"));
@@ -20,6 +21,7 @@ const PhishingHistory = lazy(() => import("@/pages/PhishingHistory"));
 const Training = lazy(() => import("@/pages/Training"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const ActivityLog = lazy(() => import("@/pages/ActivityLog"));
+const WorkspaceAdmin = lazy(() => import("@/pages/WorkspaceAdmin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const SecureVault = lazy(() => import("./pages/SecureVault"));
 
@@ -43,8 +45,8 @@ const RouteLoader = () => (
 const GlobalRedirects = () => {
   const { isAwaitingPasswordReset } = useAuth();
   const location = useLocation();
-  if (isAwaitingPasswordReset && location.pathname !== '/auth') {
-    return <Navigate to="/auth" replace />;
+  if (isAwaitingPasswordReset && location.pathname !== '/reset-password') {
+    return <Navigate to="/reset-password" replace />;
   }
   return null;
 };
@@ -62,7 +64,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<Navigate to="/auth" replace />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Protected Routes */}
                 <Route element={<ProtectedRoute />}>
@@ -78,6 +80,7 @@ const App = () => (
                     <Route path="/training/lessons" element={<Training />} />
                     <Route path="/training/simulations" element={<Training />} />
                     <Route path="/activity" element={<ActivityLog />} />
+                    <Route path="/workspace-admin" element={<WorkspaceAdmin />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/encrypt" element={<SecureVault />} />
                     <Route path="/vault" element={<SecureVault />} />
