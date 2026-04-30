@@ -65,9 +65,9 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
   };
 
   return (
-    <aside className="sticky top-0 self-start w-72 h-screen overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+    <aside className="flex flex-col w-72 h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Header */}
-      <div className="p-6 flex items-center justify-between">
+      <div className="p-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 group cursor-default">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-cyan-600 flex items-center justify-center shadow-lg shadow-primary/20 border border-white/20 relative overflow-hidden">
             <div className="absolute inset-0 bg-white/10 w-full h-full transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"></div>
@@ -95,7 +95,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
       </div>
 
       {/* Search Button */}
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-2 shrink-0">
         <Button
           variant="outline"
           className="w-full justify-start text-sidebar-foreground/60 bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -110,7 +110,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
       </div>
 
       {/* Navigation */}
-      <nav className="px-3 py-4">
+      <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.to}>
@@ -154,7 +154,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
       </nav>
 
       {/* User Section */}
-      <div className="mt-4 p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-sidebar-border shrink-0">
         {user && (
           <div className="flex items-center justify-between px-4 py-2 mb-2">
             <p className="text-xs text-sidebar-foreground/60 truncate flex-1">{user.email}</p>
@@ -176,7 +176,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
       </div>
 
       {/* Help Section */}
-      <div className="p-4 mx-3 mb-4 rounded-lg bg-sidebar-accent/30">
+      <div className="p-4 mx-3 mb-4 rounded-lg bg-sidebar-accent/30 shrink-0">
         <div className="flex items-start gap-3">
           <HelpCircle className="w-5 h-5 text-sidebar-primary flex-shrink-0 mt-0.5" />
           <div>
@@ -213,4 +213,3 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
     </aside>
   );
 }
-
