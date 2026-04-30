@@ -29,24 +29,33 @@ const extensionZipPath = path.join(__dirname, 'securewebops-extension.zip');
 const allowedOrigins = [
   'https://securewebops.gannon.link', // Your actual production domain
   'http://localhost:5173',
+  'http://localhost:8080',
+  'http://localhost:8081',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:8081',
   ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [])
 ].map(url => url.trim().replace(/\/$/, ''));
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like server-to-server) or from allowed frontend
+const corsOptions = {
+  origin(origin, callback) {
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
+
+    if (!allowedOrigins.includes(origin)) {
       console.warn(`[SECURITY] Blocked request from unauthorized CORS origin: ${origin}`);
-      return callback(null, false); // Return false instead of Error to avoid 500 HTML crashes
+      return callback(null, false);
     }
-    return callback(null, true);
+
+    return callback(null, origin);
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 app.set('trust proxy', 1);

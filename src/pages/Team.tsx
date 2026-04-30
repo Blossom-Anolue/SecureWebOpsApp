@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye, MailCheck, Inbox } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye, MailCheck, Inbox, Puzzle, Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,7 @@ const ROLE_CONFIG: Record<AppRole, { label: string; icon: typeof Crown; color: s
 export default function Team() {
   const { user } = useAuth();
   const { log } = useActivityLogger();
+  const extensionDownloadUrl = '/downloads/securewebops-extension.zip';
   const { data: organizations, isLoading: orgsLoading } = useOrganizations();
   const { data: pendingInvites, isLoading: invitesLoading } = usePendingInvites();
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
@@ -147,11 +148,14 @@ export default function Team() {
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error: any) {
+      const message =
+        error?.message?.includes('duplicate key') || error?.message?.includes('slug')
+          ? "A team with a similar name already exists. Try a different name."
+          : error?.message || "Failed to create team.";
+
       toast({
         title: "Error",
-        description: error.message?.includes('unique') 
-          ? "A team with this name already exists."
-          : "Failed to create team.",
+        description: message,
         variant: "destructive",
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
@@ -191,11 +195,16 @@ export default function Team() {
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error: any) {
+      const message =
+        error?.message?.includes('already been sent')
+          ? "An invitation has already been sent to this email."
+          : error?.message?.includes('already on this team')
+            ? "That email already belongs to someone on this team."
+            : error?.message || "Failed to send invitation.";
+
       toast({
         title: "Error",
-        description: error.message?.includes('unique')
-          ? "This user is already a member."
-          : "Failed to send invitation.",
+        description: message,
         variant: "destructive",
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
@@ -473,6 +482,42 @@ export default function Team() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="shadow-card border-primary/10 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-white">
+            <Puzzle className="w-5 h-5 text-cyan-400" />
+            Browser Extension Access
+          </CardTitle>
+          <CardDescription className="text-slate-300">
+            Company workspace users can install the SecureWebOps extension here as well, so they do not have to leave team setup to start testing phishing and quick scan features.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2 text-sm text-slate-300">
+            <p>1. Download and extract the extension zip.</p>
+            <p>2. Open <span className="font-mono text-cyan-300">chrome://extensions</span> or <span className="font-mono text-cyan-300">edge://extensions</span>.</p>
+            <p>3. Turn on Developer mode and choose Load unpacked.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={extensionDownloadUrl}
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download Extension
+            </a>
+            <Button
+              variant="outline"
+              className="border-slate-600 bg-transparent text-white hover:bg-slate-700 hover:text-white"
+              onClick={() => window.open('/phishing/check', '_blank')}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open Phishing Check
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Team Selector */}
       {!!organizations?.length && organizations.length > 1 && (

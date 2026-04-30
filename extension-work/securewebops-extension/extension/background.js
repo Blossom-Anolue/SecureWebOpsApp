@@ -1,4 +1,4 @@
-const APP_BASE_URL = "http://172.20.0.220:3000/dashboard";
+const APP_BASE_URL = "https://securewebops.gannon.link/dashboard";
 const APP_TAB_PATTERNS = [
   "http://localhost:8080/*",
   "http://172.20.0.220:3000/*",

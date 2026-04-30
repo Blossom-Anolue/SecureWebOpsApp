@@ -18,7 +18,6 @@ import { useProfile, useUpdateProfile, useNotificationSettings, useUpdateNotific
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-
 async function copyTextToClipboard(value: string) {
   if (!value) {
     throw new Error('Nothing to copy.');
@@ -94,11 +93,6 @@ export default function Settings() {
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
-  // Enterprise settings 
-  const [dlpEnabled, setDlpEnabled] = useState(false);
-  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
-  const [siemUrl, setSiemUrl] = useState('');
-
   // Initialize form values from fetched data
   useEffect(() => {
     if (profile) {
@@ -455,7 +449,7 @@ export default function Settings() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="industry">Industry</Label>
-              <Select value={industry} onValueChange={setIndustry}>
+              <Select value={industry || undefined} onValueChange={setIndustry}>
                 <SelectTrigger id="industry">
                   <SelectValue placeholder="Select industry" />
                 </SelectTrigger>
@@ -633,53 +627,9 @@ export default function Settings() {
               <ShieldCheck className="w-5 h-5 text-primary" />
               Company Workspace Security
             </CardTitle>
-            <CardDescription>Advanced data loss prevention (DLP) and compliance policies</CardDescription>
+            <CardDescription>Workspace-level compliance and audit retention visibility</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">External Sharing Restrictions (DLP)</p>
-                <p className="text-sm text-muted-foreground">Block users from sharing Vault files with email addresses outside of approved company domains.</p>
-              </div>
-              <Switch checked={dlpEnabled} onCheckedChange={(val) => {
-                setDlpEnabled(val);
-                toast({ title: val ? "DLP Enabled" : "DLP Disabled", description: "External sharing restrictions updated." });
-              }} />
-            </div>
-            <Separator className="bg-primary/10" />
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Dynamic PDF Watermarking</p>
-                <p className="text-sm text-muted-foreground">Automatically stamp the recipient's email address across files decrypted with "View Only" access to prevent unauthorized screenshots or leaks.</p>
-              </div>
-              <Switch checked={watermarkEnabled} onCheckedChange={(val) => {
-                setWatermarkEnabled(val);
-                toast({ title: val ? "Watermarking Enabled" : "Watermarking Disabled", description: "Document viewing policies updated." });
-              }} />
-            </div>
-            <Separator className="bg-primary/10" />
-            <div className="space-y-3">
-              <div>
-                <p className="font-medium">SIEM / Log Forwarding Webhook</p>
-                <p className="text-sm text-muted-foreground">Automatically forward audit logs to external security tools like Splunk or Datadog.</p>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://splunk-hec.example.com/services/collector"
-                  value={siemUrl}
-                  onChange={(e) => setSiemUrl(e.target.value)}
-                  className="bg-white dark:bg-slate-950"
-                />
-                <Button variant="secondary" onClick={() => {
-                  if (siemUrl && !/^https?:\/\/.*/.test(siemUrl)) {
-                    toast({ title: "Invalid URL", description: "Please enter a valid HTTP/HTTPS URL.", variant: "destructive" });
-                    return;
-                  }
-                  toast({ title: "SIEM Configured", description: "Audit logs will be forwarded to the specified endpoint."})
-                }}>Connect</Button>
-              </div>
-            </div>
-            <Separator className="bg-primary/10" />
             <div className="rounded-lg bg-white dark:bg-slate-900 p-4 border border-primary/20 flex items-start gap-3">
               <Database className="w-5 h-5 text-primary mt-0.5 shrink-0" />
               <div>

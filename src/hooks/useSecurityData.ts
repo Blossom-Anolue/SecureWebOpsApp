@@ -76,6 +76,8 @@ export interface Scan {
   domain_id: string;
   /** The domain name being scanned */
   domain: string;
+  /** Organization that owns this scan when it belongs to a company workspace */
+  organization_id?: string | null;
   /** Type of scan: 'quick' (~5 min) or 'full' (~15-30 min) */
   scan_type: 'quick' | 'full';
   /** Current status of the scan */

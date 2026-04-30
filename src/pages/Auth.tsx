@@ -651,7 +651,7 @@ export default function Auth() {
                       <Input
                         id="signup-full-name"
                         type="text"
-                        placeholder="Jane Doe"
+                        placeholder="John Doe"
                         className="pl-10"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
@@ -760,7 +760,30 @@ export default function Auth() {
                       </button>
                     </div>
                     {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
-                    <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>Password must include:</p>
+                      <ul className="space-y-1">
+                        <li className={password.length >= 10 ? "text-green-500" : "text-red-500"}>
+                          {password.length >= 10 ? "✓" : "✗"} At least 10 characters
+                        </li>
+
+                        <li className={/[A-Z]/.test(password) ? "text-green-500" : "text-red-500"}>
+                          {/[A-Z]/.test(password) ? "✓" : "✗"} At least one uppercase letter
+                        </li>
+
+                        <li className={/[a-z]/.test(password) ? "text-green-500" : "text-red-500"}>
+                          {/[a-z]/.test(password) ? "✓" : "✗"} At least one lowercase letter
+                        </li>
+
+                        <li className={/[0-9]/.test(password) ? "text-green-500" : "text-red-500"}>
+                          {/[0-9]/.test(password) ? "✓" : "✗"} At least one number
+                        </li>
+
+                        <li className={/[^A-Za-z0-9]/.test(password) ? "text-green-500" : "text-red-500"}>
+                          {/[^A-Za-z0-9]/.test(password) ? "✓" : "✗"} At least one special character
+                        </li>
+                      </ul>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

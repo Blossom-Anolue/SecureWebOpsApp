@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
+import { useProfile } from '@/hooks/useSecurityData';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -40,7 +42,13 @@ const navItems = [
 export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: SidebarProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { data: profile } = useProfile();
+  const { data: organizations } = useOrganizations();
+  const { data: pendingInvites } = usePendingInvites();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const showWorkspaceAdmin = Boolean(
+    profile?.company_name?.trim() || organizations?.length || pendingInvites?.length
+  );
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -57,7 +65,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
   };
 
   return (
-    <aside className="sticky top-0 self-start w-72 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
+    <aside className="sticky top-0 self-start w-72 h-screen overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Header */}
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center gap-3 group cursor-default">
@@ -102,7 +110,7 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4">
+      <nav className="px-3 py-4">
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.to}>
@@ -123,11 +131,30 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
               </NavLink>
             </li>
           ))}
+          {showWorkspaceAdmin && (
+            <li>
+              <NavLink
+                to="/workspace-admin"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-primary"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  )
+                }
+              >
+                <Unlock className="w-5 h-5" />
+                <span className="flex-1">Company</span>
+              </NavLink>
+            </li>
+          )}
         </ul>
       </nav>
 
       {/* User Section */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="mt-4 p-3 border-t border-sidebar-border">
         {user && (
           <div className="flex items-center justify-between px-4 py-2 mb-2">
             <p className="text-xs text-sidebar-foreground/60 truncate flex-1">{user.email}</p>
@@ -186,3 +213,4 @@ export function Sidebar({ onClose, onCommandOpen, onHelpOpen, onFeedbackOpen }: 
     </aside>
   );
 }
+
