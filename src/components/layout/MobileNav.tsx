@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Shield, Mail, Settings, Lock } from 'lucide-react';
+import { LayoutDashboard, Shield, Mail, Settings, Lock, Unlock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
+import { useProfile } from '@/hooks/useSecurityData';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
@@ -11,10 +13,21 @@ const navItems = [
 ];
 
 export function MobileNav() {
+  const { data: profile } = useProfile();
+  const { data: organizations } = useOrganizations();
+  const { data: pendingInvites } = usePendingInvites();
+  const showWorkspaceAdmin = Boolean(
+    profile?.company_name?.trim() || organizations?.length || pendingInvites?.length
+  );
+
+  const items = showWorkspaceAdmin
+    ? [...navItems.slice(0, 4), { to: '/workspace-admin', icon: Unlock, label: 'Admin' }, navItems[4]]
+    : navItems;
+
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-30">
       <ul className="flex justify-around items-center h-16 px-2">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <li key={item.to}>
             <NavLink
               to={item.to}
@@ -36,3 +49,4 @@ export function MobileNav() {
     </nav>
   );
 }
+

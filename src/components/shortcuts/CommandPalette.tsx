@@ -24,8 +24,11 @@ import {
   Moon,
   Monitor,
   Keyboard,
+  Unlock,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useOrganizations, usePendingInvites } from '@/hooks/useOrganizations';
+import { useProfile } from '@/hooks/useSecurityData';
 
 interface CommandPaletteProps {
   open?: boolean;
@@ -36,6 +39,12 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   const [internalOpen, setInternalOpen] = useState(false);
   const navigate = useNavigate();
   const { setTheme } = useTheme();
+  const { data: profile } = useProfile();
+  const { data: organizations } = useOrganizations();
+  const { data: pendingInvites } = usePendingInvites();
+  const showWorkspaceAdmin = Boolean(
+    profile?.company_name?.trim() || organizations?.length || pendingInvites?.length
+  );
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
@@ -88,6 +97,12 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             <Activity className="mr-2 h-4 w-4" />
             <span>Activity Log</span>
           </CommandItem>
+          {showWorkspaceAdmin && (
+            <CommandItem onSelect={() => runCommand(() => navigate('/workspace-admin'))}>
+              <Unlock className="mr-2 h-4 w-4" />
+              <span>Company</span>
+            </CommandItem>
+          )}
           <CommandItem onSelect={() => runCommand(() => navigate('/settings'))}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
@@ -146,3 +161,4 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
     </CommandDialog>
   );
 }
+

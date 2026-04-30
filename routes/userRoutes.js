@@ -216,6 +216,23 @@ router.post('/organizations/:organizationId/invitations', async (req, res) => {
       (candidate) => candidate.email?.trim().toLowerCase() === email
     );
 
+    if (matchedUser) {
+      const { data: existingMembership, error: existingMembershipError } = await supabaseAdmin
+        .from('organization_members')
+        .select('id, joined_at, role')
+        .eq('organization_id', organizationId)
+        .eq('user_id', matchedUser.id)
+        .maybeSingle();
+
+      if (existingMembershipError) {
+        return jsonError(res, 500, existingMembershipError);
+      }
+
+      if (existingMembership?.joined_at) {
+        return res.status(409).json({ error: 'That user is already part of this workspace.' });
+      }
+    }
+
     const { data: invitation, error: invitationError } = await supabaseAdmin
       .from('organization_members')
       .insert({
@@ -236,6 +253,123 @@ router.post('/organizations/:organizationId/invitations', async (req, res) => {
     return res.status(201).json({ invitation });
   } catch (error) {
     console.error('Organization invite error:', error);
+    return jsonError(res, 500, error);
+  }
+});
+
+router.post('/organizations/:organizationId/invitations/:membershipId/accept', async (req, res) => {
+  try {
+    const authResult = await authenticateBearerToken(req);
+    if (authResult.error) {
+      return jsonError(res, authResult.error.status, authResult.error);
+    }
+
+    const { user } = authResult;
+    const organizationId = req.params.organizationId;
+    const membershipId = req.params.membershipId;
+    const normalizedEmail = user.email?.trim().toLowerCase();
+
+    if (!organizationId || !membershipId || !normalizedEmail) {
+      return res.status(400).json({ error: 'Missing invitation details.' });
+    }
+
+    const { data: pendingInvites, error: pendingInvitesError } = await supabaseAdmin
+      .from('organization_members')
+      .select('id, organization_id, invited_email, role, organizations(id, name, slug)')
+      .eq('organization_id', organizationId)
+      .eq('invited_email', normalizedEmail)
+      .is('joined_at', null)
+      .order('invited_at', { ascending: true });
+
+    if (pendingInvitesError) {
+      return jsonError(res, 500, pendingInvitesError);
+    }
+
+    if (!pendingInvites?.length) {
+      return res.status(404).json({ error: 'This invitation is no longer available.' });
+    }
+
+    const matchingInvite = pendingInvites.find((invite) => invite.id === membershipId);
+    const primaryInvite = matchingInvite ?? pendingInvites[0];
+    const duplicateInviteIds = pendingInvites
+      .map((invite) => invite.id)
+      .filter((id) => id !== primaryInvite.id);
+
+    const { data: acceptedInvite, error: acceptedInviteError } = await supabaseAdmin
+      .from('organization_members')
+      .update({
+        user_id: user.id,
+        joined_at: new Date().toISOString(),
+      })
+      .eq('id', primaryInvite.id)
+      .select('*, organizations(id, name, slug)')
+      .single();
+
+    if (acceptedInviteError) {
+      return jsonError(res, 500, acceptedInviteError);
+    }
+
+    if (duplicateInviteIds.length > 0) {
+      const { error: cleanupError } = await supabaseAdmin
+        .from('organization_members')
+        .delete()
+        .in('id', duplicateInviteIds);
+
+      if (cleanupError) {
+        return jsonError(res, 500, cleanupError);
+      }
+    }
+
+    return res.status(200).json({ membership: acceptedInvite });
+  } catch (error) {
+    console.error('Organization invite accept error:', error);
+    return jsonError(res, 500, error);
+  }
+});
+
+router.delete('/organizations/:organizationId/invitations/:membershipId', async (req, res) => {
+  try {
+    const authResult = await authenticateBearerToken(req);
+    if (authResult.error) {
+      return jsonError(res, authResult.error.status, authResult.error);
+    }
+
+    const { user } = authResult;
+    const organizationId = req.params.organizationId;
+    const membershipId = req.params.membershipId;
+    const normalizedEmail = user.email?.trim().toLowerCase();
+
+    if (!organizationId || !membershipId || !normalizedEmail) {
+      return res.status(400).json({ error: 'Missing invitation details.' });
+    }
+
+    const { data: pendingInvites, error: pendingInvitesError } = await supabaseAdmin
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('invited_email', normalizedEmail)
+      .is('joined_at', null);
+
+    if (pendingInvitesError) {
+      return jsonError(res, 500, pendingInvitesError);
+    }
+
+    const inviteIds = Array.from(
+      new Set([membershipId, ...(pendingInvites ?? []).map((invite) => invite.id)])
+    );
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .in('id', inviteIds);
+
+    if (deleteError) {
+      return jsonError(res, 500, deleteError);
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Organization invite decline error:', error);
     return jsonError(res, 500, error);
   }
 });

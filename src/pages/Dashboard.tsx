@@ -142,7 +142,7 @@ export default function Dashboard() {
         <div className="space-y-1">
           <Greeting />
         </div>
-        
+
         <EmptyState
           icon={Shield}
           title="Welcome to SecureWebOps!"
@@ -279,7 +279,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
       <div className="rounded-xl border bg-gradient-to-r from-slate-900 to-slate-800 shadow-card p-6 md:p-8 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-primary/20 blur-3xl rounded-full -mr-20 -mt-20 pointer-events-none"></div>
         <div className="flex items-start gap-5 relative z-10">

@@ -17,6 +17,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+const apiBaseUrl = import.meta.env.VITE_API_PROXY_TARGET?.replace(/\/$/, '') || '';
+
 async function getAccessToken() {
   const {
     data: { session },
@@ -37,8 +39,9 @@ async function getAccessToken() {
 
 async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
   const accessToken = await getAccessToken();
+  const requestUrl = apiBaseUrl && path.startsWith('/api/') ? `${apiBaseUrl}${path}` : path;
 
-  const response = await fetch(path, {
+  const response = await fetch(requestUrl, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -221,13 +224,21 @@ export function usePendingInvites() {
       const { data, error } = await supabase
         .from('organization_members')
         .select('*, organizations(id, name, slug)')
-        .is('user_id', null)
         .is('joined_at', null)
         .eq('invited_email', normalizedEmail)
         .order('invited_at', { ascending: false });
 
       if (error) throw error;
-      return data as OrganizationMember[];
+
+      const uniqueInvites = new Map<string, OrganizationMember>();
+      for (const invite of (data as OrganizationMember[]) ?? []) {
+        const key = `${invite.organization_id}:${invite.invited_email}:${invite.role}`;
+        if (!uniqueInvites.has(key)) {
+          uniqueInvites.set(key, invite);
+        }
+      }
+
+      return Array.from(uniqueInvites.values());
     },
     enabled: !!user?.email,
   });
@@ -364,24 +375,17 @@ export function useInviteMember() {
  */
 export function useAcceptInvite() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ membershipId, organizationId }: { membershipId: string; organizationId: string }) => {
-      const { data, error } = await supabase
-        .from('organization_members')
-        .update({
-          user_id: user!.id,
-          joined_at: new Date().toISOString(),
-        })
-        .eq('id', membershipId)
-        .is('user_id', null)
-        .eq('invited_email', user!.email!.toLowerCase())
-        .select('*, organizations(id, name, slug)')
-        .single();
+      const payload = await apiRequest<{ membership: OrganizationMember }>(
+        `/api/user/organizations/${organizationId}/invitations/${membershipId}/accept`,
+        {
+          method: 'POST',
+        }
+      );
 
-      if (error) throw error;
-      return data as OrganizationMember;
+      return payload.membership;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['pending_invites'] });
@@ -397,22 +401,21 @@ export function useAcceptInvite() {
  */
 export function useDeclineInvite() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ membershipId, organizationId }: { membershipId: string; organizationId: string }) => {
-      const { error } = await supabase
-        .from('organization_members')
-        .delete()
-        .eq('id', membershipId)
-        .is('user_id', null)
-        .eq('invited_email', user!.email!.toLowerCase());
-
-      if (error) throw error;
+      await apiRequest<{ success: boolean }>(
+        `/api/user/organizations/${organizationId}/invitations/${membershipId}`,
+        {
+          method: 'DELETE',
+        }
+      );
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['pending_invites'] });
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: ['organization_members', variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['user_role', variables.organizationId] });
     },
   });
 }
