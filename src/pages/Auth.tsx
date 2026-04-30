@@ -114,6 +114,8 @@ export default function Auth() {
   useEffect(() => {
     if (user && !loading && !isAwaitingPasswordReset) {
       navigate('/dashboard');
+    } else if (isAwaitingPasswordReset) {
+      navigate('/reset-password');
     }
   }, [user, loading, isAwaitingPasswordReset, navigate]);
 
@@ -125,7 +127,7 @@ export default function Auth() {
   }, [timer]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (lockoutTimer > 0) {
       interval = setInterval(() => {
         setLockoutTimer((prev) => prev - 1);
@@ -227,12 +229,21 @@ export default function Auth() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      toast({ title: "Email Required", description: "Please enter your email to reset your password.", variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      return;
+    }
+
     setIsSubmitting(true);
-    const { error } = await resetPassword(email);
+    const { error } = await resetPassword(normalizedEmail);
     setIsSubmitting(false);
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+    }
     else {
-      toast({ title: "Email Sent", description: "Check your inbox for the reset link." });
+      toast({ title: "Email Sent", description: "Check your inbox for the reset link.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
       setIsResetting(false);
     }
   };
@@ -500,7 +511,7 @@ export default function Auth() {
                   <Label>Email</Label>
                   <Input placeholder="you@company.com" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
                 </div>
-                <Button className="w-full" disabled={isSubmitting}>Send Reset Link</Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>Send Reset Link</Button>
                 <Button type="button" variant="ghost" className="w-full" onClick={() => setIsResetting(false)}>Cancel</Button>
               </form>
             ) : (

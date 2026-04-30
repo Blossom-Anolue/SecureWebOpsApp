@@ -225,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback((email: string) =>
     supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${AUTH_REDIRECT_BASE}/auth`,
+      redirectTo: `${AUTH_REDIRECT_BASE}/reset-password`,
     }), []);
 
   const signOut = useCallback(async () => {

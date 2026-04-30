@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,6 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const navigate = useNavigate();
 
   const beginPasswordPeek = (setter: (value: boolean) => void) => (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -42,12 +40,13 @@ export default function ResetPassword() {
     setLoading(false); 
 
     if (error) {
-      toast({ title: "Password Update Failed", description: error.message, variant: "destructive" });
+      toast({ title: "Password Update Failed", description: error.message, variant: "destructive", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
     } else {
-      toast({ title: "Password Updated", description: "You can now sign in with your new password." });
-      navigate('/dashboard');
+      localStorage.removeItem('awaiting_password_reset');
+      toast({ title: "Password Updated", description: "You can now continue to your dashboard.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
+      window.location.href = '/dashboard';
     }
-  }, [password, confirmPassword, navigate]); 
+  }, [password, confirmPassword]); 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 text-center">

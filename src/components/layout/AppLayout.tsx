@@ -85,7 +85,7 @@ export function AppLayout() {
     };
   }, [signOut, toast]);
 
-  if (isAwaitingPasswordReset) {
+  if (isAwaitingPasswordReset && location.pathname !== '/reset-password') {
     return <Navigate to="/reset-password" replace />;
   }
 
