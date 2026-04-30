@@ -28,9 +28,11 @@ async function appLocalAuthLock<R>(_name: string, _acquireTimeout: number, fn: (
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: window.sessionStorage,
+    storage: window.localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
     lock: appLocalAuthLock,
   }
 });
