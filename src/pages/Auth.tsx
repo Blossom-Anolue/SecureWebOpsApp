@@ -578,8 +578,7 @@ export default function Auth() {
                     {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <button type="button" onClick={handleRequestOTP} className="text-xs text-primary hover:underline">Email Me a Sign-In Link</button>
+                  <div className="flex justify-end items-center">
                     <button type="button" onClick={() => setIsResetting(true)} className="text-xs text-primary hover:underline">Forgot password?</button>
                   </div>
 
