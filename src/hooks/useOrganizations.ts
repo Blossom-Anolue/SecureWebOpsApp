@@ -17,7 +17,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-const apiBaseUrl = import.meta.env.VITE_API_PROXY_TARGET?.replace(/\/$/, '') || '';
+const isLocalDevelopmentHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const apiBaseUrl = isLocalDevelopmentHost
+  ? import.meta.env.VITE_API_PROXY_TARGET?.replace(/\/$/, '') || ''
+  : '';
 
 async function getAccessToken() {
   const {
