@@ -22,6 +22,7 @@ export default function PDFDecryption() {
   const [isRecoverOpen, setIsRecoverOpen] = useState(false);
   const [decryptPassword, setDecryptPassword] = useState('');
   const [recoverFile, setRecoverFile] = useState<File | null>(null);
+  const [recoverPassword, setRecoverPassword] = useState('');
   const [isRecovering, setIsRecovering] = useState(false);
   const [isRecoverDragging, setIsRecoverDragging] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -273,6 +274,7 @@ export default function PDFDecryption() {
 
       const formData = new FormData();
       formData.append('file', recoverFile);
+      formData.append('password', recoverPassword);
 
       const res = await fetch('/api/pdf/decrypt-external', {
         method: 'POST',
@@ -308,6 +310,7 @@ export default function PDFDecryption() {
       toast({ title: "Recovery Successful", description: "Your file has been securely decrypted.", className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto' });
       setIsRecoverOpen(false);
       setRecoverFile(null);
+      setRecoverPassword('');
     } catch (err: any) {
       toast({ title: "Recovery Failed", description: err.message, variant: "destructive" });
     } finally {
@@ -660,6 +663,7 @@ export default function PDFDecryption() {
         if (!open) {
           setIsRecoverOpen(false);
           setRecoverFile(null);
+          setRecoverPassword('');
         }
       }}>
         <DialogContent className="sm:max-w-lg border-slate-200 dark:border-slate-800 shadow-xl">
@@ -728,17 +732,29 @@ export default function PDFDecryption() {
                 </button>
               )}
             </div>
+
+            <div className="space-y-2 mt-6 relative z-10 w-full max-w-sm mx-auto">
+              <Label htmlFor="recover-password-alt">Confirm Password</Label>
+              <Input 
+                id="recover-password-alt"
+                type="password" 
+                placeholder="••••••••" 
+                value={recoverPassword} 
+                onChange={(e) => setRecoverPassword(e.target.value)} 
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setIsRecoverOpen(false);
               setRecoverFile(null);
+              setRecoverPassword('');
             }}>
               Cancel
             </Button>
             <Button 
               onClick={handleRecoverFile}
-              disabled={!recoverFile || isRecovering}
+              disabled={!recoverFile || !recoverPassword || isRecovering}
               className="bg-primary hover:bg-primary/90 text-white shadow-sm"
             >
               {isRecovering ? (

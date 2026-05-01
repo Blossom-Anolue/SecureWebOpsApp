@@ -1353,7 +1353,7 @@ router.delete('/:fileId', checkPermission('ADMIN'), async (req, res) => {
 });
 
 // --- SECURE EXTERNAL UPLOAD & DECRYPT RECOVERY ---
-router.post('/decrypt-external', upload.single('file'), async (req, res) => {
+router.post('/decrypt-external', authLimiter, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No encrypted file provided." });
@@ -1364,10 +1364,30 @@ router.post('/decrypt-external', upload.single('file'), async (req, res) => {
         }
 
         const userId = req.user.id;
+        const userEmail = req.user.email;
         const uploadedBuffer = req.file.buffer;
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({ error: "Password is required for decryption." });
+        }
+
+        // 0. Verify Password (Step-Up Auth)
+        const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
+        
+        const { error: signInError } = await tempAuthClient.auth.signInWithPassword({
+            email: userEmail,
+            password: password,
+        });
+
+        if (signInError) {
+            await logEvent({ action: 'UNAUTHORIZED_ACCESS_ATTEMPT', status: 'BLOCKED', user: userId, ip: req.ip, details: 'Blocked recovery attempt due to incorrect password.' });
+            return res.status(401).json({ error: "Invalid password. Recovery denied." });
+        }
 
         // Determine if user is a Global System Admin (can recover orphan/deleted files)
-        const userEmail = req.user.email?.toLowerCase();
         const adminEmails = String(process.env.SYSTEM_ADMIN_EMAILS || '')
             .toLowerCase()
             .split(',')
