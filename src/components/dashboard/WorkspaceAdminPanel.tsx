@@ -13,6 +13,8 @@ import {
   User,
   UserPlus,
   Zap,
+  Search,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +69,7 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('member');
   const [justJoinedWorkspace, setJustJoinedWorkspace] = useState<{ name: string; role: AppRole } | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
   const inviteMember = useInviteMember();
   const companyName = profile?.company_name?.trim() || '';
   const isCompanyAccount = companyName.length > 0;
@@ -99,6 +102,33 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
   const activeMembers = members?.filter((member) => !!member.joined_at) ?? [];
   const latestWorkspaceScan = completedScans[0] ?? null;
   const highRiskPhishing = phishingChecks?.filter((check) => check.risk_level === 'high').length ?? 0;
+
+  const filteredMembers = members?.filter(m => 
+    (canManageWorkspace || m.user_id === user?.id) && 
+    (m.invited_email?.toLowerCase().includes(memberSearch.toLowerCase()) || m.user_id?.toLowerCase().includes(memberSearch.toLowerCase()))
+  );
+
+  const handleExportMembers = () => {
+    if (!members || !selectedOrganization) return;
+    
+    const csvContent = [
+      ['Email/ID', 'Role', 'Status', 'Joined Date'].join(','),
+      ...members.map(m => [
+        m.invited_email || m.user_id || 'Unknown',
+        ROLE_BADGE[m.role].label,
+        m.joined_at ? 'Active' : 'Pending',
+        m.joined_at ? new Date(m.joined_at).toLocaleDateString() : 'N/A'
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedOrganization.slug}-members.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const handleInvite = async () => {
     if (!selectedOrganization) return;
@@ -554,16 +584,45 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
                   <h3 className="font-semibold">Workspace people</h3>
                   <p className="text-sm text-muted-foreground">
                     Active members and pending email invites for {selectedOrganization.name}.
+                  {!canManageWorkspace && " You can only view your own membership details."}
                   </p>
                 </div>
                 {membersLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
               </div>
 
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search members by email..." 
+                  className="pl-9 bg-white dark:bg-slate-950"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                />
+              </div>
+              {canManageWorkspace && (
+                <Button variant="outline" size="sm" onClick={handleExportMembers} className="w-full sm:w-auto shrink-0">
+                  <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                  Export CSV
+                </Button>
+              )}
+            </div>
+
               {!members?.length ? (
                 <p className="text-sm text-muted-foreground">No members have been added to this workspace yet.</p>
+            ) : filteredMembers?.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl dark:border-slate-800">
+                <User className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                <p>No members found matching "{memberSearch}"</p>
+                {memberSearch && (
+                  <Button variant="link" onClick={() => setMemberSearch('')} className="mt-2">
+                    Clear search
+                  </Button>
+                )}
+              </div>
               ) : (
                 <div className="space-y-3">
-                  {members.map((member) => {
+                {filteredMembers?.map((member) => {
                     const memberRole = ROLE_BADGE[member.role];
                     const MemberIcon = memberRole.icon;
                     const displayName = member.joined_at
