@@ -50,9 +50,9 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', handleHelp);
   }, []);
 
-  // Idle Session Timeout (15 minutes)
+  // Idle Session Timeout (3 minutes)
   useEffect(() => {
-    const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+    const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
     let timeoutId: ReturnType<typeof setTimeout>;
     let lastActivity = Date.now();
 
