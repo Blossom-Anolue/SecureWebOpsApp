@@ -9,7 +9,11 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
+let cachedTransporter = null;
+
 function getEmailTransporter() {
+  if (cachedTransporter) return cachedTransporter;
+
   const host = process.env.EMAIL_SMTP_HOST;
   const user = process.env.EMAIL_SMTP_USER;
   const pass = process.env.EMAIL_SMTP_PASSWORD;
@@ -18,12 +22,14 @@ function getEmailTransporter() {
 
   if ((!host && !service) || !user || !pass) return null;
 
-  const config = { port };
+  // Enable connection pooling to keep SMTP connections alive, making sending instant
+  const config = { port, pool: true, maxConnections: 5, maxMessages: 100 };
   if (service) config.service = service;
   else config.host = host;
   config.auth = { user, pass };
 
-  return nodemailer.createTransport(config);
+  cachedTransporter = nodemailer.createTransport(config);
+  return cachedTransporter;
 }
 
 async function sendAppEmail(to, subject, text, html) {

@@ -60,6 +60,10 @@ function buildEmailTransportConfig(configSuffix = '', label = 'primary') {
     const transportConfig = {
         port,
         secure,
+        // Enable connection pooling to keep SMTP connections alive
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100
     };
 
     if (service) {

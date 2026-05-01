@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 const Home = lazy(() => import("@/pages/Home"));
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -51,6 +52,11 @@ const GlobalRedirects = () => {
   return null;
 };
 
+const RealtimeListener = () => {
+  useRealtimeNotifications();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
@@ -60,6 +66,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <GlobalRedirects />
+            <RealtimeListener />
             <Suspense fallback={<RouteLoader />}>
               <Routes>
                 <Route path="/" element={<Home />} />
