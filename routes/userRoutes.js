@@ -26,6 +26,29 @@ function getEmailTransporter() {
   return nodemailer.createTransport(config);
 }
 
+async function sendAppEmail(to, subject, text, html) {
+  try {
+    const transporter = getEmailTransporter();
+    if (!transporter) return false;
+
+    const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'no-reply@securewebops.com';
+    const fromName = process.env.EMAIL_FROM_NAME || 'SecureWebOps';
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromAddress}>`,
+      to,
+      subject,
+      text,
+      html
+    });
+    console.log(`[EMAIL] Sent '${subject}' to ${to}`);
+    return true;
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send to ${to}:`, err);
+    return false;
+  }
+}
+
 function jsonError(res, status, error) {
   const message =
     error?.message ||
@@ -66,6 +89,20 @@ function buildCandidateSlugs(name, userId) {
   ].filter(Boolean);
 }
 
+router.post('/welcome', async (req, res) => {
+  const { email, name } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const subject = 'Welcome to SecureWebOps!';
+  const text = `Hi ${name || 'there'},\n\nWelcome to SecureWebOps! We're excited to help you secure your business.\n\nLog in to your dashboard here: ${frontendUrl}/auth\n\nBest,\nThe SecureWebOps Team`;
+  const html = `<p>Hi ${name || 'there'},</p><p>Welcome to <strong>SecureWebOps</strong>! We're excited to help you secure your business.</p><p><a href="${frontendUrl}/auth">Log in to your dashboard here</a>.</p><p>Best,<br/>The SecureWebOps Team</p>`;
+
+  await sendAppEmail(email, subject, text, html);
+  
+  return res.status(200).json({ success: true });
+});
+
 router.delete('/account', async (req, res) => {
   try {
     const authResult = await authenticateBearerToken(req);
@@ -81,6 +118,13 @@ router.delete('/account', async (req, res) => {
       console.error('Error deleting user:', deleteError);
       return res.status(500).json({ error: 'Failed to delete account' });
     }
+
+    await sendAppEmail(
+      user.email,
+      'Your SecureWebOps Account Has Been Deleted',
+      'Your account has been successfully deleted. We are sorry to see you go!',
+      '<p>Your account has been successfully deleted. We are sorry to see you go!</p>'
+    );
 
     return res.status(200).json({ message: 'Account successfully deleted' });
   } catch (error) {
@@ -164,6 +208,14 @@ router.post('/organizations', async (req, res) => {
     }
 
     console.log('[ORG] created organization', organization.id);
+    
+    await sendAppEmail(
+      user.email,
+      `Workspace Created: ${organization.name}`,
+      `You have successfully created the workspace "${organization.name}".\n\nYou can now invite team members and monitor your assets.`,
+      `<p>You have successfully created the workspace <strong>${organization.name}</strong>.</p><p>You can now invite team members and monitor your assets.</p>`
+    );
+
     return res.status(201).json({ organization });
   } catch (error) {
     console.error('Organization creation error:', error);
@@ -268,46 +320,19 @@ router.post('/organizations/:organizationId/invitations', async (req, res) => {
       return jsonError(res, 500, invitationError);
     }
 
-    // --- EMAIL NOTIFICATION LOGIC ---
-    try {
-      const transporter = getEmailTransporter();
-      if (transporter) {
-        // Get organization details
-        const { data: orgData } = await supabaseAdmin
-          .from('organizations')
-          .select('name')
-          .eq('id', organizationId)
-          .single();
-          
-        const orgName = orgData?.name || 'a company workspace';
-
-        // Get inviter details
-        const { data: inviterData } = await supabaseAdmin
-          .from('profiles')
-          .select('full_name, email')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const inviterName = inviterData?.full_name || inviterData?.email || user.email || 'A team member';
-
-        const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'no-reply@securewebops.com';
-        const fromName = process.env.EMAIL_FROM_NAME || 'SecureWebOps';
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const loginLink = `${frontendUrl}/auth`;
-
-        await transporter.sendMail({
-          from: `"${fromName}" <${fromAddress}>`,
-          to: email,
-          subject: `You have been invited to join ${orgName} on SecureWebOps`,
-          text: `Hello!\n\n${inviterName} has invited you to join the ${orgName} workspace on SecureWebOps.\n\nLog in here to accept your invitation: ${loginLink}\n\nThank you,\nThe SecureWebOps Team`,
-          html: `<p>Hello!</p><p><strong>${inviterName}</strong> has invited you to join the <strong>${orgName}</strong> workspace on SecureWebOps.</p><p><a href="${loginLink}">Click here to log in and accept your invitation</a></p><p>Thank you,<br/>The SecureWebOps Team</p>`
-        });
-        console.log(`[INVITE] Email sent to ${email} for org ${orgName}`);
-      }
-    } catch (emailErr) {
-      console.error('[INVITE] Failed to send invite email:', emailErr);
-    }
-    // --- END EMAIL NOTIFICATION LOGIC ---
+    // Get organization & inviter details for the email
+    const { data: orgData } = await supabaseAdmin.from('organizations').select('name').eq('id', organizationId).single();
+    const orgName = orgData?.name || 'a company workspace';
+    const { data: inviterData } = await supabaseAdmin.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle();
+    const inviterName = inviterData?.full_name || inviterData?.email || user.email || 'A team member';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    await sendAppEmail(
+      email,
+      `You have been invited to join ${orgName} on SecureWebOps`,
+      `Hello!\n\n${inviterName} has invited you to join the ${orgName} workspace on SecureWebOps.\n\nLog in here to accept your invitation: ${frontendUrl}/auth\n\nThank you,\nThe SecureWebOps Team`,
+      `<p>Hello!</p><p><strong>${inviterName}</strong> has invited you to join the <strong>${orgName}</strong> workspace on SecureWebOps.</p><p><a href="${frontendUrl}/auth">Click here to log in and accept your invitation</a></p><p>Thank you,<br/>The SecureWebOps Team</p>`
+    );
 
     return res.status(201).json({ invitation });
   } catch (error) {
@@ -379,6 +404,13 @@ router.post('/organizations/:organizationId/invitations/:membershipId/accept', a
       }
     }
 
+    await sendAppEmail(
+      user.email,
+      `You joined ${primaryInvite.organizations?.name || 'a workspace'}`,
+      `You have successfully joined the workspace "${primaryInvite.organizations?.name || 'a workspace'}" as a ${primaryInvite.role}.`,
+      `<p>You have successfully joined the workspace <strong>${primaryInvite.organizations?.name || 'a workspace'}</strong> as a ${primaryInvite.role}.</p>`
+    );
+
     return res.status(200).json({ membership: acceptedInvite });
   } catch (error) {
     console.error('Organization invite accept error:', error);
@@ -429,6 +461,68 @@ router.delete('/organizations/:organizationId/invitations/:membershipId', async 
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Organization invite decline error:', error);
+    return jsonError(res, 500, error);
+  }
+});
+
+router.delete('/organizations/:organizationId/members/:memberId', async (req, res) => {
+  try {
+    const authResult = await authenticateBearerToken(req);
+    if (authResult.error) return jsonError(res, authResult.error.status, authResult.error);
+    const { user } = authResult;
+    const { organizationId, memberId } = req.params;
+
+    // 1. Verify requester has admin/owner privileges
+    const { data: requester } = await supabaseAdmin
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!requester || !['owner', 'admin'].includes(requester.role)) {
+      return res.status(403).json({ error: 'Only owners or admins can remove members.' });
+    }
+
+    // 2. Get member details for the email
+    const { data: memberData } = await supabaseAdmin
+      .from('organization_members')
+      .select('*, organizations(name)')
+      .eq('id', memberId)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (!memberData) return res.status(404).json({ error: 'Member not found.' });
+
+    // 3. Delete the member
+    const { error: deleteError } = await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .eq('id', memberId);
+
+    if (deleteError) return jsonError(res, 500, deleteError);
+
+    // 4. Send the removal email
+    let targetEmail = memberData.invited_email;
+    if (!targetEmail && memberData.user_id) {
+      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(memberData.user_id);
+      targetEmail = userData?.user?.email;
+    }
+    
+    const orgName = memberData.organizations?.name || 'the workspace';
+    
+    if (targetEmail) {
+      await sendAppEmail(
+        targetEmail,
+        `You have been removed from ${orgName}`,
+        `Hello,\n\nYou have been removed from the workspace "${orgName}" on SecureWebOps.\nIf you believe this was a mistake, please contact the workspace administrator.`,
+        `<p>Hello,</p><p>You have been removed from the workspace <strong>${orgName}</strong> on SecureWebOps.</p><p>If you believe this was a mistake, please contact the workspace administrator.</p>`
+      );
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Member removal error:', error);
     return jsonError(res, 500, error);
   }
 });

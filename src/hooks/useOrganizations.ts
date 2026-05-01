@@ -473,12 +473,12 @@ export function useRemoveMember() {
 
   return useMutation({
     mutationFn: async ({ memberId, organizationId }: { memberId: string; organizationId: string }) => {
-      const { error } = await supabase
-        .from('organization_members')
-        .delete()
-        .eq('id', memberId);
-
-      if (error) throw error;
+      await apiRequest<{ success: boolean }>(
+        `/api/user/organizations/${organizationId}/members/${memberId}`,
+        {
+          method: 'DELETE',
+        }
+      );
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organization_members', variables.organizationId] });

@@ -54,6 +54,8 @@ const signUpSchema = authSchema.extend({
   path: ["confirmPassword"]
 });
 
+const apiBaseUrl = import.meta.env.VITE_API_PROXY_TARGET?.replace(/\/$/, '') || '';
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -377,10 +379,12 @@ export default function Auth() {
     } else {
       setShowVerification(true);
       setShowMagicLinkSent(false);
-      // Send welcome email asynchronously
-      supabase.functions.invoke('send-welcome-email', {
-        body: { email, name: fullName }
-      }).catch(err => console.error("Failed to send welcome email:", err));
+      // Send welcome email via our Node.js backend
+      fetch(`${apiBaseUrl}/api/user/welcome`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: fullName })
+      }).catch(err => console.error("Failed to trigger welcome email:", err));
     }
   };
 
