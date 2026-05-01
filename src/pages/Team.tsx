@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye, MailCheck, Inbox, Puzzle, Download, ExternalLink } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Trash2, Loader2, Building2, Crown, ShieldCheck, User, Eye, MailCheck, Inbox, Puzzle, Download, ExternalLink, Search, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,6 @@ const ROLE_CONFIG: Record<AppRole, { label: string; icon: typeof Crown; color: s
   owner: { label: 'Owner', icon: Crown, color: 'text-warning' },
   admin: { label: 'Admin', icon: ShieldCheck, color: 'text-primary' },
   member: { label: 'Member', icon: User, color: 'text-foreground' },
-  viewer: { label: 'Viewer', icon: Eye, color: 'text-muted-foreground' },
 };
 
 export default function Team() {
@@ -61,6 +60,7 @@ export default function Team() {
   const [inviteRole, setInviteRole] = useState<AppRole>('member');
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [isBulkRemoving, setIsBulkRemoving] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
 
   const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
 
@@ -308,6 +308,33 @@ export default function Team() {
       setIsBulkRemoving(false);
     }
   };
+
+  const handleExportMembers = () => {
+    if (!members || !selectedOrg) return;
+    
+    const csvContent = [
+      ['Email/ID', 'Role', 'Status', 'Joined Date'].join(','),
+      ...members.map(m => [
+        m.invited_email || m.user_id || 'Unknown',
+        ROLE_CONFIG[m.role].label,
+        m.joined_at ? 'Active' : 'Pending',
+        m.joined_at ? new Date(m.joined_at).toLocaleDateString() : 'N/A'
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedOrg.slug}-members.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const filteredMembers = members?.filter(m => 
+    (canManageMembers || m.user_id === user?.id) && 
+    (m.invited_email?.toLowerCase().includes(memberSearch.toLowerCase()) || m.user_id?.toLowerCase().includes(memberSearch.toLowerCase()))
+  );
 
   if (orgsLoading) {
     return <LoadingState message="Loading teams..." />;
@@ -594,7 +621,6 @@ export default function Team() {
                         <SelectContent>
                           <SelectItem value="admin">Admin - Can manage team</SelectItem>
                           <SelectItem value="member">Member - Full access</SelectItem>
-                          <SelectItem value="viewer">Viewer - View only</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -626,8 +652,26 @@ export default function Team() {
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search members by email..." 
+                    className="pl-9 bg-white dark:bg-slate-950"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                  />
+                </div>
+                {canManageMembers && (
+                  <Button variant="outline" size="sm" onClick={handleExportMembers} className="w-full sm:w-auto shrink-0">
+                    <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                    Export CSV
+                  </Button>
+                )}
+              </div>
+
               {canManageMembers && members?.filter(m => m.user_id !== user?.id && m.role !== 'owner').length! > 0 && (
-                <div className="flex items-center justify-between pb-3 mb-3 border-b dark:border-slate-800">
+                <div className="flex items-center justify-between pb-3 mb-1 border-b dark:border-slate-800">
                   <label className="flex items-center gap-3 cursor-pointer text-sm font-medium">
                     <input 
                       type="checkbox"
@@ -645,7 +689,19 @@ export default function Team() {
                   )}
                 </div>
               )}
-              {members?.map((member) => {
+              
+              {filteredMembers?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl dark:border-slate-800">
+                  <Users className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                  <p>No members found matching "{memberSearch}"</p>
+                  {memberSearch && (
+                    <Button variant="link" onClick={() => setMemberSearch('')} className="mt-2">
+                      Clear search
+                    </Button>
+                  )}
+                </div>
+              ) : (
+              filteredMembers?.map((member) => {
                 const RoleIcon = ROLE_CONFIG[member.role].icon;
                 const isCurrentUser = member.user_id === user?.id;
                 const isPending = !member.joined_at;
@@ -702,7 +758,6 @@ export default function Team() {
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="member">Member</SelectItem>
-                            <SelectItem value="viewer">Viewer</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button
@@ -717,7 +772,7 @@ export default function Team() {
                     )}
                   </div>
                 );
-              })}
+              }))}
             </div>
           )}
         </CardContent>
@@ -748,7 +803,6 @@ export default function Team() {
                     {role === 'owner' && 'Full control including team deletion'}
                     {role === 'admin' && 'Manage team members, company domains, and view company-wide scans'}
                     {role === 'member' && 'Run scans, join company workspaces, and view only your own scan results'}
-                    {role === 'viewer' && 'Read-only access to company-wide scans and reports'}
                   </p>
                 </div>
               );

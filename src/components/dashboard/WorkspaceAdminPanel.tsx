@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   Building2,
   Crown,
-  Eye,
   Globe,
   Loader2,
   Mail,
@@ -45,7 +44,6 @@ const ROLE_BADGE: Record<AppRole, { label: string; tone: string; icon: typeof Cr
   owner: { label: 'Supa Admin', tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300', icon: Crown },
   admin: { label: 'Admin', tone: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300', icon: ShieldCheck },
   member: { label: 'Member', tone: 'bg-slate-500/10 text-slate-700 dark:text-slate-300', icon: User },
-  viewer: { label: 'Viewer', tone: 'bg-violet-500/10 text-violet-700 dark:text-violet-300', icon: Eye },
 };
 
 interface WorkspaceAdminPanelProps {
@@ -604,7 +602,6 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
                                 <SelectContent>
                                   <SelectItem value="admin">Admin</SelectItem>
                                   <SelectItem value="member">Member</SelectItem>
-                                  <SelectItem value="viewer">Viewer</SelectItem>
                                   {isOwner && <SelectItem value="owner">Supa Admin</SelectItem>}
                                 </SelectContent>
                               </Select>
@@ -657,7 +654,6 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -685,7 +681,7 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
               <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
                 <p className="font-medium text-foreground mb-1">How this works</p>
                 <p>
-                  Owners act as the workspace’s “supa admin,” admins can manage shared teammates, and members/viewers stay scoped to the workspace access their role allows. The invite is stored against the organization and can be accepted later by the matching account email.
+                  Owners act as the workspace’s “supa admin,” admins can manage shared teammates, and members stay scoped to the workspace access their role allows. The invite is stored against the organization and can be accepted later by the matching account email.
                 </p>
               </div>
             </div>

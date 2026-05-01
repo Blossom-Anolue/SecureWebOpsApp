@@ -81,9 +81,8 @@ async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
  * - owner: Full control, can delete organization
  * - admin: Can manage members and settings
  * - member: Can run scans and view results
- * - viewer: Read-only access to view results
  */
-export type AppRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type AppRole = 'owner' | 'admin' | 'member';
 
 /**
  * Represents a team/organization.
