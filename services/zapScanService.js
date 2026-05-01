@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
+import nodemailer from 'nodemailer';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
@@ -1109,6 +1110,79 @@ async function persistScanArtifacts(scanId, userId, summary, findings) {
   }
 }
 
+// --- NOTIFICATION SERVICES ---
+function getEmailTransporter() {
+  const host = process.env.EMAIL_SMTP_HOST;
+  const user = process.env.EMAIL_SMTP_USER;
+  const pass = process.env.EMAIL_SMTP_PASSWORD;
+  const port = Number.parseInt(process.env.EMAIL_SMTP_PORT || '587', 10);
+  const service = process.env.EMAIL_SMTP_SERVICE;
+
+  if ((!host && !service) || !user || !pass) return null;
+
+  const config = { port };
+  if (service) config.service = service;
+  else config.host = host;
+  config.auth = { user, pass };
+
+  return nodemailer.createTransport(config);
+}
+
+async function checkAndSendCriticalAlert(userId, scanId, target, issueCounts, scanError = null) {
+  if (!userId) return;
+
+  try {
+    // 1. Check user notification preferences
+    const { data: settings } = await supabaseAdmin
+      .from('notification_settings')
+      .select('critical_alerts, email_notifications')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!settings || !settings.critical_alerts || !settings.email_notifications) return;
+
+    // 2. Get user email
+    const { data: userData, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const email = userData?.user?.email;
+    if (!email || error) return;
+
+    // 3. Configure SMTP transporter
+    const transporter = getEmailTransporter();
+    if (!transporter) {
+      console.warn('[ALERTS] Email transporter not configured. Cannot send critical alert.');
+      return;
+    }
+
+    const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'no-reply@securewebops.com';
+    const fromName = process.env.EMAIL_FROM_NAME || 'SecureWebOps';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const scanLink = `${frontendUrl}/scans`;
+
+    let subject, text, html;
+
+    if (scanError) {
+      subject = `Critical Alert: Scan Failed for ${target}`;
+      text = `Your security scan for ${target} failed to complete.\n\nReason: ${scanError}\n\nPlease check your SecureWebOps dashboard for more details: ${scanLink}`;
+      html = `<p>Your security scan for <strong>${target}</strong> failed to complete.</p><p><strong>Reason:</strong> ${scanError}</p><p><a href="${scanLink}">View Dashboard</a></p>`;
+    } else {
+      subject = `Critical Alert: High-Risk Vulnerabilities Found on ${target}`;
+      text = `Your recent security scan for ${target} has completed and found CRITICAL vulnerabilities.\n\nCritical Issues: ${issueCounts.critical}\nHigh Issues: ${issueCounts.high}\n\nPlease log in immediately to review and remediate these issues: ${scanLink}`;
+      html = `<p>Your recent security scan for <strong>${target}</strong> has completed and found <strong>CRITICAL</strong> vulnerabilities.</p><ul><li>Critical Issues: ${issueCounts.critical}</li><li>High Issues: ${issueCounts.high}</li></ul><p><a href="${scanLink}">Review Findings</a></p>`;
+    }
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromAddress}>`,
+      to: email,
+      subject,
+      text,
+      html
+    });
+    console.log(`[ALERTS] Critical alert email sent to ${email} for scan ${scanId}`);
+  } catch (err) {
+    console.error(`[ALERTS] Failed to send critical alert email:`, err);
+  }
+}
+
 export async function processScan(scanId, target) {
   console.log(`[SCAN] Starting processing for ${scanId} -> ${target}`);
   const { data: scanMeta } = await supabaseAdmin
@@ -1146,6 +1220,7 @@ export async function processScan(scanId, target) {
       target,
       details: { reason: 'Max concurrent scans reached' },
     });
+    checkAndSendCriticalAlert(scanMeta?.user_id, scanId, target, null, 'Max concurrent scans reached').catch(() => {});
     return;
   }
 
@@ -1203,6 +1278,10 @@ if (startError) {
       target,
       details: { score: summary.score, scanner: summary.scanner, issue_counts: summary.issue_counts },
     });
+
+    if (summary.issue_counts.critical > 0) {
+      checkAndSendCriticalAlert(scanMeta?.user_id, scanId, target, summary.issue_counts, null).catch(() => {});
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Scan failed';
     console.error(`[SCAN] ${scanId} failed: ${message}`);
@@ -1223,6 +1302,8 @@ if (startError) {
       target,
       details: { reason: message, scanner: getScanProvider() },
     });
+
+    checkAndSendCriticalAlert(scanMeta?.user_id, scanId, target, null, message).catch(() => {});
   }
 }
 

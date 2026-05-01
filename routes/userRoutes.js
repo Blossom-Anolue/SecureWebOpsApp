@@ -1,12 +1,30 @@
 import express from 'express';
 import { supabaseAdmin } from '../services/supabaseAdmin.js';
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
 const router = express.Router();
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+
+function getEmailTransporter() {
+  const host = process.env.EMAIL_SMTP_HOST;
+  const user = process.env.EMAIL_SMTP_USER;
+  const pass = process.env.EMAIL_SMTP_PASSWORD;
+  const port = Number.parseInt(process.env.EMAIL_SMTP_PORT || '587', 10);
+  const service = process.env.EMAIL_SMTP_SERVICE;
+
+  if ((!host && !service) || !user || !pass) return null;
+
+  const config = { port };
+  if (service) config.service = service;
+  else config.host = host;
+  config.auth = { user, pass };
+
+  return nodemailer.createTransport(config);
+}
 
 function jsonError(res, status, error) {
   const message =
@@ -249,6 +267,47 @@ router.post('/organizations/:organizationId/invitations', async (req, res) => {
     if (invitationError) {
       return jsonError(res, 500, invitationError);
     }
+
+    // --- EMAIL NOTIFICATION LOGIC ---
+    try {
+      const transporter = getEmailTransporter();
+      if (transporter) {
+        // Get organization details
+        const { data: orgData } = await supabaseAdmin
+          .from('organizations')
+          .select('name')
+          .eq('id', organizationId)
+          .single();
+          
+        const orgName = orgData?.name || 'a company workspace';
+
+        // Get inviter details
+        const { data: inviterData } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const inviterName = inviterData?.full_name || inviterData?.email || user.email || 'A team member';
+
+        const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'no-reply@securewebops.com';
+        const fromName = process.env.EMAIL_FROM_NAME || 'SecureWebOps';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const loginLink = `${frontendUrl}/auth`;
+
+        await transporter.sendMail({
+          from: `"${fromName}" <${fromAddress}>`,
+          to: email,
+          subject: `You have been invited to join ${orgName} on SecureWebOps`,
+          text: `Hello!\n\n${inviterName} has invited you to join the ${orgName} workspace on SecureWebOps.\n\nLog in here to accept your invitation: ${loginLink}\n\nThank you,\nThe SecureWebOps Team`,
+          html: `<p>Hello!</p><p><strong>${inviterName}</strong> has invited you to join the <strong>${orgName}</strong> workspace on SecureWebOps.</p><p><a href="${loginLink}">Click here to log in and accept your invitation</a></p><p>Thank you,<br/>The SecureWebOps Team</p>`
+        });
+        console.log(`[INVITE] Email sent to ${email} for org ${orgName}`);
+      }
+    } catch (emailErr) {
+      console.error('[INVITE] Failed to send invite email:', emailErr);
+    }
+    // --- END EMAIL NOTIFICATION LOGIC ---
 
     return res.status(201).json({ invitation });
   } catch (error) {

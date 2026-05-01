@@ -39,6 +39,7 @@ import {
 } from '@/hooks/useOrganizations';
 import { usePhishingChecks, useProfile, type Domain, type Scan } from '@/hooks/useSecurityData';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActivityLogger } from '@/hooks/useActivityLog';
 
 const ROLE_BADGE: Record<AppRole, { label: string; tone: string; icon: typeof Crown }> = {
   owner: { label: 'Supa Admin', tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300', icon: Crown },
@@ -58,6 +59,7 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
   const { data: organizations } = useOrganizations();
   const { data: pendingInvites } = usePendingInvites();
   const { data: profile } = useProfile();
+  const { log } = useActivityLogger();
   const acceptInvite = useAcceptInvite();
   const declineInvite = useDeclineInvite();
   const createOrganization = useCreateOrganization();
@@ -179,6 +181,21 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
   const handleCreateWorkspace = async () => {
     if (!companyName) return;
 
+    // Prevent free email providers from claiming new company workspaces
+    const email = user?.email?.toLowerCase() || '';
+    const freeEmailDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com'];
+    const userDomain = email.split('@')[1];
+
+    if (freeEmailDomains.includes(userDomain)) {
+      toast({
+        title: 'Business Email Required',
+        description: 'To register a brand new company workspace, you must use a professional business email address.',
+        variant: 'destructive',
+        className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
+      });
+      return;
+    }
+
     const suggestedSlug = companyName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -191,15 +208,26 @@ export function WorkspaceAdminPanel({ domains, scans }: WorkspaceAdminPanelProps
       });
 
       setSelectedOrgId(organization.id);
+      
+      log('team.created', 'organization', {
+        resourceId: organization.id,
+        organizationId: organization.id,
+        details: { name: companyName },
+      });
+
       toast({
         title: 'Company workspace created',
         description: `${companyName} now has a shared workspace with you as Supa Admin.`,
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
     } catch (error: any) {
+      const isDuplicate = error?.message?.toLowerCase().includes('duplicate') || error?.message?.toLowerCase().includes('slug');
+
       toast({
-        title: 'Workspace setup failed',
-        description: error?.message || 'We could not create the company workspace.',
+        title: isDuplicate ? 'Company Name Registered' : 'Workspace setup failed',
+        description: isDuplicate
+          ? `The company "${companyName}" is already registered. To gain access to this workspace, the current administrator must send an invite to your email address.`
+          : error?.message || 'We could not create the company workspace.',
         variant: 'destructive',
         className: 'fixed top-4 right-4 md:top-4 md:right-4 z-[100] w-[calc(100%-2rem)] sm:w-auto',
       });
